@@ -1,0 +1,56 @@
+#customInfoBox {
+    width: 500px; /* Ajusta el ancho deseado */
+    max-width: 90%; /* Opcional, para asegurar que se ajuste en pantallas pequeñas */
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(42, 42, 42, 0.9);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+@media (max-width: 600px) {
+    #customInfoBox {
+        width: 90%; /* Usar casi todo el ancho disponible */
+    }
+}
+
+.custom-hotspot-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+
+
+  
+  #customInfoBox h3 {
+    margin: 0 0 10px;
+    font-size: 18px;
+  }
+  
+  #customInfoBox p {
+    margin: 0 0 10px;
+  }
+  
+  #customInfoBox button {
+    margin-top: 10px;
+    background: rgba(255, 255, 255, 0.1); /* Fondo claro semitransparente */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  
+  #customInfoBox button:hover {
+    background: rgba(255, 255, 255, 0.2); /* Cambio de color al pasar el cursor */
+  }
+  

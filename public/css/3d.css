@@ -1,0 +1,612 @@
+/* General */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+#cesiumContainer {
+    flex: 1 1 auto; /* Permite que el contenedor crezca y ocupe el espacio disponible */
+    position: relative; /* Para que los elementos absolutamente posicionados dentro sean relativos a este contenedor */
+    display: flex; /* Si es necesario, para que los hijos de #cesiumContainer puedan usar flexbox */
+    flex-direction: column; /* Opcional, según tus necesidades */
+    /* Remueve las alturas fijas */
+    /* height: 100vh; */
+}
+
+#header {
+    flex: 0 0 auto;
+}
+
+/* Layer widget styles */
+#layerWidget {
+    position: absolute;
+    top: 15%;
+    left: 7%;
+    background: rgba(20, 20, 20, 0.95);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+    color: white;
+    z-index: 1000;
+    width: 320px;
+    display: none;
+}
+
+.sidebar-buttons {
+    position: absolute;
+    left: 40px;
+    top: 15%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.sidebar-buttons div {
+    cursor: pointer;
+    z-index: 1001;
+    width: 30px;
+    height: 30px;
+    background: rgba(42, 42, 42, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    color: white;
+    font-size: 20px;
+}
+
+/* Tabs */
+.tabs {
+    margin-bottom: 0;
+    margin-top: 20px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.tabs ul li {
+    margin-right: 5px;
+}
+
+.tabs ul li a {
+    color: white !important;
+    text-decoration: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+}
+
+.tabs ul li.is-active a {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.tabs ul li a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Layer item */
+.layer-item {
+    display: flex;
+    justify-content: space-between;
+    background: rgba(20, 20, 20, 0.95);
+    align-items: center;
+    padding: 8px;
+    border-color: #dbdbdb;
+    border-style: solid;
+    border-width: 1px;
+    margin-bottom: 0;
+}
+
+/* Measurement window */
+#measurementWindow {
+    position: absolute;
+    bottom: 10px;
+    right: 40%;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    z-index: 1000;
+    width: 200px;
+    border-radius: 5px;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+/* Notification */
+.notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1001;
+    display: none;
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1200; /* Lo suficientemente alto para estar sobre otros elementos */
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6); /* Fondo oscuro semitransparente */
+}
+
+.modal.is-active {
+    display: flex; /* Visible cuando tiene la clase `is-active` */
+}
+
+  #focusPointDialog {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  #focusPointDialog header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  #focusPointDialog section {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 14px;
+  }
+
+  #focusPointDialog footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .modal-background {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .modal-background.active,
+  #focusPointDialog.active {
+    display: block;
+  }
+
+.modal-card {
+    z-index: 1201;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 30px;
+    cursor: pointer;
+    z-index: 1201;
+}
+
+.modal-card-head,
+.modal-card-foot {
+    background-color: #f5f5f5;
+}
+
+.modal-card-title {
+    color: #4a4a4a;
+}
+
+/* Export widget styles */
+.export-widget {
+    display: none;
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1200;
+    width: 300px;
+}
+
+.export-widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.export-widget-body {
+    margin-bottom: 20px;
+}
+
+.export-widget-footer {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Toolbar */
+#toolbarContainer {
+    position: absolute;
+    top: 10%;
+    left: 100px;
+    z-index: 2000;
+    background: rgba(42, 42, 42, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    display: none;
+    flex-direction: column;
+}
+
+#toolbar {
+    display: flex;
+    flex-direction: column;
+}
+
+#toolbar button {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-size: 24px;
+}
+
+#toolbar button.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid #ffffff;
+}
+
+#toolbar button i {
+    color: white;
+    font-size: 24px;
+}
+
+/* Dialog styles */
+#inputDialog,
+#inputDialogLine,
+#inputDialogPolygon,
+#inputDialogExtruded,
+#inputDialogText,
+#inputDialogRectangle,
+#inputDialogCircle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    display: none;
+}
+
+#inputDialog label,
+#inputDialogLine label,
+#inputDialogPolygon label,
+#inputDialogExtruded label,
+#inputDialogText label,
+#inputDialogRectangle label,
+#inputDialogCircle label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.slider {
+    width: 100%;
+}
+
+/* Message box */
+#messageBox {
+    position: absolute;
+    top: 10px;
+    right: 50%;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    display: none;
+    z-index: 1000;
+}
+
+/* Ensure the Cesium container adapts to the header height */
+body.has-header #cesiumContainer {
+    height: calc(100vh - 60px);
+}
+
+/* Print button */
+#printBtn {
+    z-index: 1200; /* Asegura que el ícono de impresión esté sobre los demás elementos */
+    cursor: pointer;
+    font-size: 24px;
+    background: rgba(42, 42, 42, 0.8);
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#printBtn i {
+    color: white;
+}
+
+.icon-selector,
+.icon-options-container {
+    display: none;
+    position: absolute;
+    left: 100px;
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.icon-selector {
+    top: calc(60% + 10px);
+}
+
+.icon-options-container {
+    top: calc(70% + 10px);
+}
+
+.icon-selector img,
+.icon-options-container i {
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    margin: 5px;
+}
+
+.icon-options-container i {
+    color: white;
+    padding: 5px;
+    font-size: 20px;
+}
+
+#inputDialog,
+#inputDialogModel,
+#inputDialogLine,
+#inputDialogPolygon,
+#inputDialogExtruded,
+#inputDialogText,
+#inputDialogRectangle,
+#inputDialogCircle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    display: none;
+}
+
+
+#inputDialogModel {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    display: none;
+}
+
+/* Estilos para pantallas pequeñas */
+@media (max-width: 600px) {
+    /* Ajustar el tamaño y la posición de la barra lateral */
+    .sidebar-buttons {
+        left: 10px !important;
+        top: 5% !important;
+        gap: 12px !important;
+        width: 100px !important;
+    }
+
+    .sidebar-buttons div {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 24px !important;
+    }
+
+    /* Ajustar el contenedor de botones del toolbar */
+    #toolbarContainer {
+        left: 5% !important;
+        top: 5% !important;
+    }
+
+    #toolbar button {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 24px !important;
+    }
+
+    /* Ajustes del widget de capas */
+    #layerWidget {
+        width: 90% !important;
+        left: 5% !important;
+        top: 10% !important;
+        padding: 12px !important;
+        font-size: 16px !important;
+    }
+
+    /* Estilos para los diálogos de entrada */
+    #inputDialog,
+    #inputDialogModel,
+    #inputDialogLine,
+    #inputDialogPolygon,
+    #inputDialogExtruded,
+    #inputDialogText,
+    #inputDialogRectangle,
+    #inputDialogCircle {
+        width: 90% !important;
+        top: 10% !important;
+        font-size: 16px !important;
+        padding: 12px !important;
+    }
+
+    /* Ajustar el tamaño del botón de impresión y otros iconos */
+    #printBtn,
+    .icon-options-container i,
+    #toolbar button i {
+        font-size: 28px !important;
+    }
+
+    /* Estilos para las pestañas en el widget */
+    .tabs ul li a {
+        padding: 8px 12px !important;
+    }
+}
+
+
+
+#saveContainer {
+    display: none;
+    position: relative;
+    background: #4a4a4a; /* Fondo oscuro */
+    padding: 15px;
+    border-radius: 5px;
+    color: white; /* Color del texto en blanco */
+    z-index: 10;
+    margin-top: 10px;
+    width: 200px;
+}
+
+#saveContainer input {
+    margin-bottom: 10px; /* Espacio debajo del input */
+    width: 100%;
+    padding: 5px;
+    color: white;
+    background-color: rgba(20, 20, 20, 0.9);
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+#saveContainer button {
+    color: white;
+    background-color: rgba(60, 60, 60, 0.8);
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    margin-top: 5px;
+    cursor: pointer;
+}
+
+#saveContainer button:hover {
+    background-color: rgba(80, 80, 80, 0.8);
+}
+
+#saveContainer button + button {
+    margin-left: 5px; /* Espacio entre botones */
+}
+
+/* Contenedor flex para cada capa */
+.flex-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 5px; /* Espaciado vertical opcional */
+  }
+  
+  /* Contenedor para agrupar los botones de zoom y eliminar */
+  .buttons-group {
+    display: flex;
+    gap: 10px; /* Espacio entre los botones */
+  }
+  
+  /* Opcional: Ajustar el cursor al pasar el mouse sobre los iconos */
+  .layer-right i {
+    cursor: pointer;
+    font-size: 1.2em; /* Tamaño del icono, ajusta según necesidad */
+  }
+  
+  /* Opcional: Añadir un efecto hover para mejorar la interacción */
+  .layer-right i:hover {
+    opacity: 0.7;
+  }
+  
+  #skyboxWidget {
+    position: absolute;
+    top: 60px;
+    right: 10px;
+    width: 300px;
+    padding: 15px;
+    background: rgba(20, 20, 20, 0.95);
+    border-radius: 10px;
+    box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+    color: white;
+    z-index: 1000;
+  }
+  
+  #skyboxWidget.hidden {
+    display: none;
+  }
+  
+  .widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .close-widget-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: white;
+  }
+  
+  
+  .widget-content label,
+  .widget-content input,
+  .widget-content select,
+  .widget-content button {
+    margin-bottom: 10px;
+    width: 100%;
+  }
+  
+  
+
+
+
+
+
+

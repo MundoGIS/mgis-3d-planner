@@ -1,0 +1,17 @@
+{
+  "id": "f64c2666-2d94-4b0e-88c9-601098ff8e18",
+  "name": "default",
+  "cesiumToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjMTc0Y2RkNC02OWUzLTQ4YWUtOTljMy0wODE2MjFjZWFlODAiLCJpZCI6MjA1NzYwLCJpYXQiOjE3MjY2NjI3NDN9.7peKXxWxAzT9kbzBj1FBlPhlfhA6NnwHNXj0vGXhpXE",
+  "config": {
+    "layers": [
+      {
+        "name": "OpenStreetMap",
+        "type": "osm",
+        "isBaseLayer": true,
+        "key": 1726655123501,
+        "visible": true
+      }
+    ],
+    "terrains": []
+  }
+}

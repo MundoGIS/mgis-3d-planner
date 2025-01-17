@@ -1,0 +1,84 @@
+<style>
+    .logo-container {
+        width: 50px; /* Ajusta este valor al ancho deseado */
+        height: auto;
+    }
+
+    .logo-container img {
+        width: 100%; /* Ajusta la imagen al contenedor */
+        height: 100%; /* Mantiene la proporción */
+    }
+
+    .navbar-item img {
+        max-height: 1 rem;
+        padding-right: 0.5rem;
+        margin-left: 20%;
+    }
+</style>
+
+<header class="header">
+    <nav class="navbar" role="navigation" aria-label="main navigation">
+        <div class="navbar-brand">
+            <a class="navbar-item" href="/">
+                <!-- Puedes colocar aquí tu logo o nombre de la aplicación -->
+                <div class="logo-container">
+                    <img src="/public/images/logo-mundogis.webp" alt="Logo">
+                </div>                  
+            </a>
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </a>
+        </div>
+
+        <div id="navbarBasicExample" class="navbar-menu">
+            <div class="navbar-start">
+                <!-- Navbar items con dropdowns -->
+
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link" href="#">Geodata</a>
+                    <div class="navbar-dropdown">
+                        <a class="navbar-item" href="/data/geodata">Geodata</a>
+                    </div>
+                </div>
+
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link" href="#">3D</a>
+                    <div class="navbar-dropdown">
+                        <a class="navbar-item" href="/3d/cesium-map">3D</a>
+                    </div>
+                </div>
+
+               
+
+                <% if (userRole === 'admin') { %>
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link" href="#">Admin</a>
+                    <div class="navbar-dropdown">
+                        <a class="navbar-item" href="/admin/users">Manage Users</a>
+                    </div>
+                </div>
+                <% } %>
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link" href="#">Support</a>
+                    <div class="navbar-dropdown">
+                        <a class="navbar-item" href="/about/om-gismanager">About us</a>
+                    </div>
+                </div>
+            </div>
+
+            <% if (isAuthenticated) { %>
+            <div class="navbar-end">
+                <div class="navbar-item">
+                    <div class="buttons">
+                        <a class="button is-light" href="/logout">
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <% } %>
+        </div>
+    </nav>
+</header>

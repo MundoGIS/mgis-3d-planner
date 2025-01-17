@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <%- include('./layouts/head'); -%>
+    <link href="/public/Thirdparty/Cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="/public/Thirdparty/Cesium/Build/Cesium/Cesium.js"></script>
+    <script src="/public/Thirdparty/cesium-navigation-1.1.8/dist/standalone/viewerCesiumNavigationMixin.js"></script>
+    <link rel="stylesheet" href="/public/css/geodata.css">
+</head>
+
+<body>
+  <% if (isAuthenticated && userRole==='admin' ) { %>
+    <header id="header">
+      <%- include('./layouts/header'); -%>
+    </header>
+    <% } else { %>
+      <p>You do not have access to this section.</p>
+      <% } %>
+
+        <div class="container">
+          <section class="section">
+            <div class="box">
+              <h1 class="title">Upload your Geodata</h1>
+
+              <!-- Formulario principal de subida -->
+              <form id="uploadForm" action="/data/api/files" method="post" enctype="multipart/form-data" class="form">
+                <!-- Contenedor del input de archivos y el botón para subir -->
+                <div class="field is-grouped is-grouped-multiline">
+                  <!-- Campo para elegir archivo(s) -->
+                  <div class="control">
+                    <div class="file has-name">
+                      <label class="file-label">
+                        <input id="fileInput" class="file-input" type="file" name="files" multiple>
+                        <span class="file-cta">
+                          <span class="file-icon">
+                            <i class="fas fa-upload"></i>
+                          </span>
+                          <span class="file-label">
+                            Choose files...
+                          </span>
+                        </span>
+                        <span class="file-name">
+                          No file selected
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Opciones de tipo (2D, 3D, etc.) con sus descripciones -->
+                  <div class="control is-expanded">
+                    <div class="field is-grouped is-grouped-multiline">
+                      <div class="control">
+                        <label class="radio">
+                          <input type="radio" name="uploadType" value="2d" checked>
+                          <strong>2D</strong>
+                          <small class="has-text-grey">
+                            (JPG, Geotif, PNG, Tiff)
+                          </small>
+                        </label>
+                      </div>
+
+                      <div class="control">
+                        <label class="radio">
+                          <input type="radio" name="uploadType" value="3d">
+                          <strong>3D</strong>
+                          <small class="has-text-grey">
+                            (GLTF, CZML, KML, KMZ)
+                          </small>
+                        </label>
+                      </div>
+
+                      <div class="control">
+                        <label class="radio">
+                          <input type="radio" name="uploadType" value="3Dtiles">
+                          <strong>3D Tiles</strong>
+                          <small class="has-text-grey">
+                            (ZIP first!)
+                          </small>
+                        </label>
+                      </div>
+
+                      <div class="control">
+                        <label class="radio">
+                          <input type="radio" name="uploadType" value="terrain">
+                          <strong>Terrain</strong>
+                          <small class="has-text-grey">
+                            (Quantized Mesh, ZIP first!)
+                          </small>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- Vista previa (solo para imágenes) -->
+                    <div id="imagePreview" style="margin-top:0.5rem;"></div>
+                  </div>
+
+                  <!-- Botón de “Upload” -->
+                  <div class="control">
+                    <button id="uploadButton" class="button is-primary" type="submit" style="margin-left:1rem;">
+                      Upload
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <!-- Sección para mostrar archivos ya subidos -->
+            <div class="box">
+              <h2 class="title">These are your Geodata files</h2>
+              <div class="columns">
+                <div class="column">
+                  <h3 class="subtitle">2D Files</h3>
+                  <ul id="fileList2D" class="is-size-5"></ul>
+                </div>
+                <div class="column">
+                  <h3 class="subtitle">3D Files</h3>
+                  <ul id="fileList3D" class="is-size-5"></ul>
+                </div>
+                <div class="column">
+                  <h3 class="subtitle">3D-tiles</h3>
+                  <ul id="fileList3Dtiles" class="is-size-5"></ul>
+                </div>
+                <div class="column">
+                  <h3 class="subtitle">Terrain Files</h3>
+                  <ul id="fileListTerrain" class="is-size-5"></ul>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Modal para manipular coordenadas y terreno (igual que antes) -->
+        <div id="view-modal" class="modal">
+          <div class="modal-content">
+            <span class="close">&times;</span>
+
+
+            <div>
+              <!-- Agrega un nuevo botón para copiar link -->
+              <button id="copyLinkButton" class="button is-info" style="margin: 5px; ">
+                Copy Data Link
+              </button>
+              <br>
+              <div style="width: 90%; padding: 5px;" class="terrain-table" id="terrainTable">
+                <div class="field">
+                  <div class="control">
+                    <div class="select is-fullwidth">
+                      <select id="terrainSelect">
+                        <option value="" disabled selected>-- Select a terrain --</option>
+                        <option value="cesiumIon">Flat terrain</option>
+                        <!-- Terrenos locales se generan dinámicamente -->
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <br>
+                <label for="terrainHeight">Terrain altitud:</label>
+                <input type="text" id="terrainHeight" readonly />
+              </div>
+              <br>
+              <table style="width: 90%; padding: 5px; border: none;" class="coordinate-table" id="coordinateTable">
+                <tr>
+                  <td>X:</td>
+                  <td><input type="text" id="xCoordinate"></td>
+                </tr>
+                <tr>
+                  <td>Y:</td>
+                  <td><input type="text" id="yCoordinate"></td>
+                </tr>
+                <tr>
+                  <td>Z:</td>
+                  <td><input type="text" id="zCoordinate"></td>
+                </tr>
+                <tr>
+                  <td>Model size:</td>
+                  <td><input type="number" id="scaleInput" value="1" step="0.1"></td>
+                </tr>
+                <tr>
+                  <td>Horizontal rotation:</td>
+                  <td><input type="number" id="horizontalRotationInput" value="0" step="1"></td>
+                </tr>
+                <tr>
+                  <td>Vertical rotation:</td>
+                  <td><input type="number" id="verticalRotationInput" value="0" step="1"></td>
+                </tr>
+                <tr>
+                  <td>Lateral rotation:</td>
+                  <td><input type="number" id="lateralRotationInput" value="0" step="1"></td>
+                </tr>
+                <label class="checkbox" id="lockButton"> <input type="checkbox">Lock Modell </label>
+              </table>
+            </div>
+            <div id="cesiumContainer"></div>
+          </div>
+        </div>
+
+        <!-- Script con tu lógica de Cesium y subida de archivos -->
+        <script src="/public/js/3d/cesium_models.js"></script>
+</body>
+
+</html>

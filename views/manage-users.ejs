@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <%- include('./layouts/head'); -%>
+</head>
+<%- include('./layouts/header'); -%>
+
+<body>
+  <section class="section">
+    <div class="container">
+      <h1 class="title">Manage Users</h1>
+
+      <!-- Formulario para añadir un nuevo usuario -->
+      <div class="box">
+        <h2 class="subtitle">Add New User</h2>
+        <form action="/admin/users/add" method="POST">
+          <div class="field">
+            <label class="label">Username</label>
+            <div class="control">
+              <input class="input" type="text" name="username" required>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Password</label>
+            <div class="control">
+              <input class="input" type="password" name="password" required>
+            </div>
+          </div>
+          <div class="field">
+            <button class="button is-primary" type="submit">Add User</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tabla para listar y gestionar usuarios existentes -->
+      <div class="box">
+        <h2 class="subtitle">Existing Users</h2>
+        <table class="table is-fullwidth">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(user => { %>
+              <tr>
+                <td><%= user.username %></td>
+                <td><%= user.role %></td>
+                <td>
+                  <form action="/admin/users/delete" method="POST" style="display:inline;">
+                    <input type="hidden" name="username" value="<%= user.username %>">
+                    <% if (user.username !== 'admin') { %>
+                      <button class="button is-danger is-small" type="submit">Delete</button>
+                    <% } else { %>
+                      <button class="button is-danger is-small" disabled>Cannot Delete</button>
+                    <% } %>
+                  </form>
+                  <!-- Permitir cambiar la contraseña de admin si está autenticado -->
+                  <button class="button is-info is-small" onclick="showEditModal('<%= user.username %>')">Change Password</button>
+                </td>
+                
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal para cambiar la contraseña -->
+  <div id="editModal" class="modal">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="box">
+        <h2 class="title">Change Password</h2>
+        <form id="editForm" action="/admin/users/edit" method="POST">
+          <input type="hidden" name="username" id="editUsername">
+          <div class="field">
+            <label class="label">New Password</label>
+            <div class="control">
+              <input class="input" type="password" name="password" required>
+            </div>
+          </div>
+          <div class="field">
+            <button class="button is-primary" type="submit">Change Password</button>
+            <button type="button" class="button is-light" onclick="closeEditModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <button class="modal-close is-large" aria-label="close" onclick="closeEditModal()"></button>
+  </div>
+
+  <script>
+    function showEditModal(username) {
+      document.getElementById('editUsername').value = username;
+      document.getElementById('editModal').classList.add('is-active');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('is-active');
+    }
+  </script>
+</body>
+
+</html>

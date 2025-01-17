@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('./layouts/head'); -%>
+</head>
+<body>
+  <section class="section is-fullheight">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-4-desktop">
+          <div class="box">
+            <h1 class="title has-text-centered">Login Page</h1>
+            <form action="/login" method="POST">
+              <div class="field">
+                <label class="label" for="username">Username</label>
+                <div class="control has-icons-left">
+                  <input class="input" type="text" id="username" name="username" placeholder="User name" required>
+                  <span class="icon is-small is-left">
+                    <i class="fas fa-user"></i>
+                  </span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="label" for="password">Password</label>
+                <div class="control has-icons-left">
+                  <input class="input" type="password" id="password" name="password" placeholder="Password" required>
+                  <span class="icon is-small is-left">
+                    <i class="fas fa-lock"></i>
+                  </span>
+                </div>
+              </div>
+              <div class="field">
+                <div class="control">
+                  <button class="button is-primary is-fullwidth" type="submit">Login</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <%- include('./layouts/footer'); -%>
+</body>
+</html>

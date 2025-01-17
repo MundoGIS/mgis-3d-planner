@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link href="/public/Thirdparty/Cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="/public/Thirdparty/Cesium/Build/Cesium/Cesium.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf/turf.min.js"></script>
+  <script src="/public/Thirdparty/cesium-navigation-1.1.8/dist/standalone/viewerCesiumNavigationMixin.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+  <!-- Incluye html2canvas desde un CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Latest compiled and minified standalone viewer -->
+
+  <link rel="stylesheet" href="/public/Thirdparty/pannellum-2.5.6/pannellum/pannellum.css">
+  <script src="/public/Thirdparty/pannellum-2.5.6/pannellum/pannellum.js"></script>
+
+
+  <!-- Reemplazo de Font Awesome por Boxicons -->
+  <link href="https://unpkg.com/boxicons@latest/css/boxicons.min.css" rel="stylesheet">
+
+
+  <!-- Bulma CSS -->
+  <link rel="stylesheet" href="/public/css/bulma.css">
+  <link rel="stylesheet" href="/public/css/3d.css">
+  <link rel="stylesheet" href="/public/css/infobox.css">
+
+</head>
+
+<body class="<%= isAuthenticated ? 'has-header' : '' %>">
+
+  <% if (isAuthenticated && userRole==='admin' ) { %>
+    <header id="header">
+      <%- include('./layouts/header'); -%>
+    </header>
+    <% } %>
+      <div id="cesiumContainer">
+        <div id="customInfoBox"
+          style="display: none; position: absolute; top: 10%; left: 50%; transform: translateX(-50%); background: rgba(42,42,42,0.9); color: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 1000;">
+          <div id="customInfoBoxContent"></div>
+          <button onclick="closeCustomInfoBox()"
+            style="margin-top: 10px; background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; cursor: pointer; border-radius: 5px;">Cerrar</button>
+        </div>
+
+
+
+        <!-- Toolbar Container -->
+        <div id="toolbarContainer" style="display: none;">
+          <div id="toolbar">
+
+
+
+
+
+
+            <!-- Herramientas existentes -->
+            <button id="gltfModelButton" onclick="toggleTool('gltfModel')" title="Add GLTF Model">
+              <i class='bx bx-cube-alt'></i>
+            </button>
+            <button id="pointButton" onclick="toggleTool('point')" title="Add Point">
+              <i class='bx bx-map-pin'></i>
+            </button>
+            <button id="lineButton" onclick="toggleTool('line')" title="Add Line">
+              <i class='bx bx-line-chart'></i>
+            </button>
+            <button id="polygonButton" onclick="toggleTool('polygon')" title="Add Polygon">
+              <i class='bx bx-shape-polygon'></i>
+            </button>
+            <button id="extrudedPolygonButton" onclick="toggleTool('extrudedPolygon')" title="Add Extruded Polygon">
+              <i class='bx bx-cube'></i>
+            </button>
+            <button id="textButton" onclick="toggleTool('text')" title="Add Text">
+              <i class='bx bx-font'></i>
+            </button>
+            <!-- Botón de Círculo -->
+            <button id="circleButton" onclick="toggleTool('circle')" title="Add Circle">
+              <i class='bx bx-circle'></i>
+            </button>
+            <!-- Botón para limpiar entidades -->
+            <button id="clearButton" onclick="clearEntities()" title="Clear All">
+              <i class='bx bx-trash'></i>
+            </button>
+          </div>
+        </div>
+
+
+        <div id="simulationControlsContainer"
+          style="display: none; position: absolute; top: 15%; left: 80px; background: rgba(42, 42, 42, 0.9); padding: 15px; border-radius: 8px; z-index: 2000; color: white;">
+          <header style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 16px; font-weight: bold;">Simulation Controls</span>
+            <div>
+              <button id="toggleContainerButton" onclick="toggleSimulationControls()"
+                style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">−</button>
+              <button onclick="closeSimulationControls()"
+                style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+          </header>
+          <div id="simulationControlsContent">
+            <div style="margin-top: 10px;">
+              <label for="pitchSlider" style="display: block; margin-bottom: 5px;">Pitch</label>
+              <input id="pitchSlider" type="range" min="-90" max="90" step="1" value="0"
+                onchange="SimulationModule.updatePitch(this.value)" style="width: 100%;">
+              <span id="pitchValue" style="display: block; text-align: center;">0°</span>
+            </div>
+            <div style="margin-top: 10px;">
+              <label for="speedSlider" style="display: block; margin-bottom: 5px;">Speed</label>
+              <input id="speedSlider" type="range" min="0.0001" max="0.4000" step="0.0001" value="0.0025"
+                onchange="SimulationModule.updateSpeed(this.value)" style="width: 100%;">
+              <span id="speedValue" style="display: block; text-align: center;">0.0025</span>
+            </div>
+            <div>
+              <label for="cameraHeight">Camera Height (m):</label>
+              <input id="cameraHeight" type="number" value="10" step="1" min="0" />
+            </div>
+
+            <button id="simulationPlayButton" class="button" onclick="SimulationModule.toggleSimulation()"
+              style="margin-top: 10px; width: 100%;">Play</button>
+          </div>
+        </div>
+        <div class="modal-background" onclick="closeFocusPointDialog()"></div>
+
+        <div id="focusPointDialog">
+          <header>
+            <p>Select Focus Point</p>
+            <button class="delete" aria-label="close" onclick="closeFocusPointDialog()"></button>
+          </header>
+          <section>
+            <p>Click on the map to select a point where the camera will focus during the simulation.</p>
+          </section>
+          <footer>
+            <button class="button is-success" onclick="SimulationModule.startFocusPointSelection()">Select
+              Point</button>
+            <button class="button" onclick="closeFocusPointDialog()">Cancel</button>
+          </footer>
+        </div>
+
+        <div class="sidebar-buttons">
+          <% if (isAuthenticated && userRole==='admin' ) { %>
+            <div id="configTokenToggle" title="Configure Cesium Token">
+              <i class='bx bx-cog'></i>
+            </div>
+            <% } %>
+
+              <div>
+                <a href="/logout" title="Logout">
+                  <i class='bx bx-log-out'></i>
+                </a>
+              </div>
+              <div id="layersWidgetToggle">
+                <i class='bx bx-layer'></i>
+              </div>
+              <div id="distanceMeasurementToggle">
+                <i class='bx bx-ruler'></i>
+              </div>
+              <div id="addIconBtn" title="Leave your feedback">
+                <i class='bx bx-comment-dots'></i>
+              </div>
+              <!-- Botón de Punto de Enfoque -->
+              <div id="focusPointButton" title="Start Simulation" onclick="openFocusPointDialog()">
+                <i class='bx bx-street-view'></i>
+              </div>
+              <div id="skyboxToggle" title="Skybox Settings" onclick="toggleSkyboxWidget()">
+                <i class='bx bx-cloud'></i>
+              </div>
+
+              <% if (isAuthenticated && userRole==='admin' ) { %>
+                <div id="toggleMessagesBtn" title="Show/Hide options">
+                  <i class='bx bx-message'></i>
+                </div>
+                <% } %>
+                  <!-- <div id="infoboxToggle">
+                    <i class='bx bx-info-circle'></i>
+                  </div> -->
+                  <div id="redlineToggle" title="Redline Tools">
+                    <i class='bx bx-pencil'></i>
+                  </div>
+                  <div id="printBtn" title="Print Map" onclick="openExportModal(event)">
+                    <i class='bx bx-printer' style="font-size: 24px;"></i>
+                  </div>
+                  <div id="toggleTimelineButton" onclick="toggleTimeline()" title="On/Off Clock">
+                    <i class='bx bx-time-five'></i> <!-- Icono para representar el botón del timeline -->
+                  </div>
+                  <div id="toggleShadowsButton" onclick="toggleShadows()" title="Toggle Shadows">
+                    <i class='bx bx-moon'></i> <!-- Icono para el botón de sombras -->
+                  </div>
+        </div>
+
+        <div id="skyboxWidget" class="widget hidden">
+          <div class="widget-header">
+            <h3>Skybox and Clouds Settings</h3>
+            <button class="close-widget-btn" onclick="toggleSkyboxWidget()">×</button>
+          </div>
+          <div class="widget-content">
+            <table>
+              <tbody>
+                <tr>
+                  <td>Base Height (m)</td>
+                  <td>
+                    <input type="range" min="50" max="500" step="10" data-bind="value: baseHeight, valueUpdate: 'input'">
+                    <input type="text" size="4" data-bind="value: baseHeight">
+                  </td>
+                </tr>
+                <tr>
+                  <td>Separation</td>
+                  <td>
+                    <input type="range" min="0.01" max="0.1" step="0.01" data-bind="value: separation, valueUpdate: 'input'">
+                    <input type="text" size="4" data-bind="value: separation">
+                  </td>
+                </tr>
+                <tr>
+                  <td>Scale X</td>
+                  <td>
+                    <input type="range" min="100" max="5000" step="50" data-bind="value: scaleX, valueUpdate: 'input'">
+                    <input type="text" size="4" data-bind="value: scaleX">
+                  </td>
+                </tr>
+                <tr>
+                  <td>Scale Y</td>
+                  <td>
+                    <input type="range" min="100" max="5000" step="50" data-bind="value: scaleY, valueUpdate: 'input'">
+                    <input type="text" size="4" data-bind="value: scaleY">
+                  </td>
+                </tr>
+                <tr>
+                  <td>Brightness</td>
+                  <td>
+                    <input type="range" min="0.0" max="1.0" step="0.1" data-bind="value: brightness, valueUpdate: 'input'">
+                    <input type="text" size="4" data-bind="value: brightness">
+                  </td>
+                </tr>
+                <tr>
+                  <td>Color</td>
+                  <td>
+                    <select data-bind="options: colors, value: color"></select>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Position by Map Click</td>
+                  <td>
+                    <button onclick="activateCloudPositioning()">Activate</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div id="inputDialog">
+          <label for="pointColorInput">Color:</label>
+          <input type="color" id="pointColorInput" value="#FF0000">
+          <label for="pointHeightInput">Height:</label>
+          <input type="number" id="pointHeightInput" value="0" step="10">
+          <label for="pointSizeInput">Size:</label>
+          <input type="number" id="pointSizeInput" value="10" step="1">
+          <label for="pointZoomInput">Zoom Interval:</label>
+          <input type="number" id="pointZoomInput" value="1000" step="100">
+          <label for="pointTransparencyInput">Transparency:</label>
+          <input type="range" id="pointTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <button onclick="applyPointSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialog')">Cancel</button>
+        </div>
+        <div id="inputDialogModel">
+          <label for="gltfModelSelect">GLTF Model:</label>
+          <select id="gltfModelSelect"></select>
+          <button onclick="applyModelSettings()">Apply</button>
+          <button onclick="closeModelDialog()">Close</button>
+        </div>
+
+        <div id="inputDialogLine">
+          <label for="lineColorInput">Color:</label>
+          <input type="color" id="lineColorInput" value="#0000FF">
+          <label for="lineWidthInput">Width:</label>
+          <input type="number" id="lineWidthInput" value="3" step="1">
+          <label for="lineStyleInput">Style:</label>
+          <select id="lineStyleInput">
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="dotted">Dotted</option>
+          </select>
+          <label for="lineZoomInput">Zoom Interval:</label>
+          <input type="number" id="lineZoomInput" value="1000" step="100">
+          <label for="lineTransparencyInput">Transparency:</label>
+          <input type="range" id="lineTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <button onclick="applyLineSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogLine')">Cancel</button>
+        </div>
+        <div id="inputDialogPolygon">
+          <label for="polygonColorInput">Color:</label>
+          <input type="color" id="polygonColorInput" value="#00FF00">
+          <label for="polygonZoomInput">Zoom Interval:</label>
+          <input type="number" id="polygonZoomInput" value="1000" step="100">
+          <label for="polygonTransparencyInput">Transparency:</label>
+          <input type="range" id="polygonTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <button onclick="applyPolygonSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogPolygon')">Cancel</button>
+        </div>
+        <div id="inputDialogExtruded">
+          <label for="extrudedColorInput">Color:</label>
+          <input type="color" id="extrudedColorInput" value="#FFA500">
+          <label for="extrudedHeightInput">Extruded Height:</label>
+          <input type="number" id="extrudedHeightInput" value="30000" step="1000">
+          <label for="extrudedZoomInput">Zoom Interval:</label>
+          <input type="number" id="extrudedZoomInput" value="1000" step="100">
+          <label for="extrudedTransparencyInput">Transparency:</label>
+          <input type="range" id="extrudedTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <button onclick="applyExtrudedSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogExtruded')">Cancel</button>
+        </div>
+        <div id="inputDialogText">
+          <label for="textColorInput">Color:</label>
+          <input type="color" id="textColorInput" value="#FFFFFF">
+          <label for="textHeightInput">Height:</label>
+          <input type="number" id="textHeightInput" value="0" step="10">
+          <label for="textSizeInput">Size:</label>
+          <input type="number" id="textSizeInput" value="20" step="1">
+          <label for="textInput">Text:</label>
+          <input type="text" id="textInput" value="Sample Text">
+          <label for="textZoomInput">Zoom Interval:</label>
+          <input type="number" id="textZoomInput" value="1000" step="100">
+          <label for="textTransparencyInput">Transparency:</label>
+          <input type="range" id="textTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <button onclick="applyTextSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogText')">Cancel</button>
+        </div>
+        <div id="inputDialogRectangle">
+          <label for="rectangleColorInput">Color:</label>
+          <input type="color" id="rectangleColorInput" value="#FFD700">
+          <label for="rectangleTransparencyInput">Transparency:</label>
+          <input type="range" id="rectangleTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <label for="rectangleHeightInput">Extruded Height:</label>
+          <input type="number" id="rectangleHeightInput" value="0" step="1000">
+          <label for="rectangleZoomInput">Zoom Interval:</label>
+          <input type="number" id="rectangleZoomInput" value="1000" step="100">
+          <button onclick="applyRectangleSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogRectangle')">Cancel</button>
+        </div>
+        <div id="inputDialogCircle">
+          <label for="circleColorInput">Color:</label>
+          <input type="color" id="circleColorInput" value="#FF69B4">
+          <label for="circleTransparencyInput">Transparency:</label>
+          <input type="range" id="circleTransparencyInput" class="slider" value="1" step="0.1" min="0" max="1">
+          <label for="circleRadiusInput">Radius:</label>
+          <input type="number" id="circleRadiusInput" value="1000" step="100">
+          <label for="circleZoomInput">Zoom Interval:</label>
+          <input type="number" id="circleZoomInput" value="1000" step="100">
+          <button onclick="applyCircleSettings()">Apply</button>
+          <button onclick="closeDialog('inputDialogCircle')">Cancel</button>
+        </div>
+
+        <div id="messageBox"></div>
+
+        <div class="icon-options-container" id="iconOptions">
+          <i class='bx bx-show' id="showAllIconsBtn" title="Show/Hide icons"></i>
+          <i class='bx bx-trash' id="deleteAllIconsBtn" title="Delete all icons"></i>
+        </div>
+
+        <div class="icon-selector" id="iconSelector">
+          <img src="/public/css/icons/smile.png" data-icon="happy" alt="Happy Icon">
+          <img src="/public/css/icons/sad.png" data-icon="semi-arg" alt="Semi arg Icon">
+          <img src="/public/css/icons/arg.png" data-icon="arg" alt="Sad Icon">
+        </div>
+
+        <div class="notification is-primary" id="thankYouMessage">
+          <button class="delete"></button>
+          Tack för ditt meddelande!
+        </div>
+
+        <div id="layerWidget">
+          <div class="tabs is-toggle is-fullwidth">
+            <ul>
+              <li class="is-active" data-tab="layersTab"><a><i class='bx bx-layer'></i></a></li>
+              <li data-tab="basemapsTab"><a><i class='bx bx-map'></i></a></li>
+              <li data-tab="terrainTab"><a><i class='bx bx-landscape'></i></a></li>
+            </ul>
+          </div>
+
+          <div id="layersTab" class="tab-content active">
+            <div id="vectorLayersList"></div>
+          </div>
+
+          <div id="basemapsTab" class="tab-content">
+            <div id="baseLayersList"></div>
+          </div>
+
+          <div id="terrainTab" class="tab-content">
+            <div id="terrainLayersList">
+              <label class="layer-item">
+                <input type="radio" name="terrainType" value="elevation" onchange="toggleTerrain('elevation')" checked>
+                Terrain with elevation
+              </label>
+              <label class="layer-item">
+                <input type="radio" name="terrainType" value="flat" onchange="toggleTerrain('flat')">
+                Flat terrain
+              </label>
+            </div>
+          </div>
+
+
+          <div class="control-buttons">
+            <% if (isAuthenticated && userRole==='admin' ) { %>
+              <i class='bx bx-plus bx-3x' id="addLayerButton" title="Add Layer"
+                style="cursor: pointer; margin-right: 10px;"></i>
+              <i class='bx bx-refresh bx-3x' id="reloadMapButton" title="Reload Map"
+                style="cursor: pointer; margin-right: 10px;"></i>
+
+              <% } %>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Export Modal -->
+      <div id="exportModal" class="modal">
+        <div class="modal-background" onclick="closeExportModal()"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Print Settings</p>
+            <button class="delete" aria-label="close" onclick="closeExportModal()"></button>
+          </header>
+          <section class="modal-card-body">
+            <!-- Title Settings -->
+            <div class="field">
+              <label class="label">Title</label>
+              <div class="control">
+                <input class="input" type="text" id="exportTitle" placeholder="Enter map title">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Title Font Type</label>
+              <div class="control">
+                <div class="select">
+                  <select id="titleFontType">
+                    <option value="helvetica">Helvetica</option>
+                    <option value="times">Times</option>
+                    <option value="courier">Courier</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Title Font Size</label>
+              <div class="control">
+                <input class="input" type="number" id="titleFontSize" value="16">
+              </div>
+            </div>
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" id="boldTitle"> Bold Title
+              </label>
+            </div>
+
+            <!-- Description Settings -->
+            <div class="field">
+              <label class="label">Description</label>
+              <div class="control">
+                <textarea class="textarea" id="exportDescription" placeholder="Enter map description"></textarea>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Description Font Type</label>
+              <div class="control">
+                <div class="select">
+                  <select id="descriptionFontType">
+                    <option value="helvetica">Helvetica</option>
+                    <option value="times">Times</option>
+                    <option value="courier">Courier</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Description Font Size</label>
+              <div class="control">
+                <input class="input" type="number" id="descriptionFontSize" value="12">
+              </div>
+            </div>
+
+            <!-- Margins Settings -->
+            <div class="field">
+              <label class="label">Margins</label>
+              <div class="control">
+                <input class="input" type="number" id="customMargin" value="10" min="5" max="20"> <!-- Margen en mm -->
+              </div>
+            </div>
+
+            <!-- Border Option -->
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" id="showBorder" checked> Show Border
+              </label>
+            </div>
+
+            <!-- Other Settings -->
+            <div class="field">
+              <label class="label">Paper Size</label>
+              <div class="control">
+                <div class="select">
+                  <select id="exportPaperSize">
+                    <option value="a4">A4</option>
+                    <option value="a3">A3</option>
+                    <option value="a2">A2</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Orientation</label>
+              <div class="control">
+                <div class="select">
+                  <select id="exportOrientation">
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Logo Position</label>
+              <div class="control">
+                <div class="select">
+                  <select id="logoPosition">
+                    <option value="top-left">Top Left</option>
+                    <option value="top-center">Top Center</option>
+                    <option value="top-right">Top Right</option>
+                    <option value="bottom-center">Bottom Center</option>
+                    <option value="none">None</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" id="showDate"> Show Date
+              </label>
+            </div>
+            <div class="field">
+              <label class="checkbox">
+                <input type="checkbox" id="showScale"> Show Scale
+              </label>
+            </div>
+            <div class="field">
+              <label class="label">Description Position</label>
+              <div class="control">
+                <div class="select">
+                  <select id="descriptionPosition">
+                    <option value="above">Above Map</option>
+                    <option value="below">Below Map</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" onclick="startExport()">Print Map</button>
+            <button class="button" onclick="closeExportModal()">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <div id="configModal" class="modal">
+        <div class="modal-background" onclick="closeConfigModal()"></div>
+        <div class="modal-card">
+          <header class="modal-card-head">
+            <p class="modal-card-title">Configure Cesium Token</p>
+            <button class="delete" aria-label="close" onclick="closeConfigModal()"></button>
+          </header>
+          <section class="modal-card-body">
+            <div class="field">
+              <label class="label">New Cesium Token</label>
+              <div class="control">
+                <input class="input" type="text" id="newCesiumToken" placeholder="Enter new Cesium token">
+              </div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-success" onclick="saveNewToken()">Save</button>
+            <button class="button" onclick="closeConfigModal()">Cancel</button>
+          </footer>
+        </div>
+      </div>
+
+      <!-- Scripts -->
+      <script src="/public/js/3d/cesium.js"></script>
+      <script src="/public/js/3d/redline.js"></script>
+      <script src="/public/js/3d/simulation.js"></script>
+      <script>
+        var altitudeOffset = 100; // Asigna el valor apropiado según tu lógica
+        console.log('altitudeOffset:', altitudeOffset);
+      </script>
+      <script src="/public/js/3d/layers-config.js"></script>
+      <script src="/public/js/3d/cesium-medir.js"></script>
+      <script src="/public/js/3d/cesium-talk.js"></script>
+      <!-- <script src="/public/js/3d/panorama.js"></script> -->
+      <script src="/public/js/3d/cesium-print.js"></script>
+
+
+      <script>
+
+      
+        // Manejo de pestañas
+        document.querySelectorAll('.tabs ul li').forEach(tab => {
+          tab.addEventListener('click', function () {
+            document.querySelectorAll('.tabs ul li').forEach(t => t.classList.remove('is-active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            this.classList.add('is-active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+          });
+        });
+
+        // Ocultar el widget de capas al hacer clic fuera de él
+        document.addEventListener('click', function (event) {
+          var widget = document.getElementById('layerWidget');
+          var toggle = document.getElementById('layersWidgetToggle');
+          if (!widget.contains(event.target) && !toggle.contains(event.target)) {
+            widget.style.display = 'none';
+          }
+        });
+
+        // Detener la propagación del clic dentro del widget de capas
+        document.getElementById('layerWidget').addEventListener('click', function (event) {
+          event.stopPropagation();
+        });
+
+        // Alternar la visibilidad del widget de capas
+        document.getElementById('layersWidgetToggle').addEventListener('click', function () {
+          var widget = document.getElementById('layerWidget');
+          if (widget) {
+            widget.style.display = widget.style.display === 'block' ? 'none' : 'block';
+            if (widget.style.display === 'block') {
+              updateLayerVisibility();
+            }
+          }
+        });
+
+        // Alternar la herramienta de medición de distancia
+        document.getElementById('distanceMeasurementToggle').addEventListener('click', function () {
+          toggleMeasurement();
+        });
+
+        // Configuración del toolbar del Redline
+        var toolbarContainer = document.getElementById('toolbarContainer');
+
+        // Alternar visibilidad del toolbar del Redline
+        document.getElementById('redlineToggle').addEventListener('click', function () {
+          if (toolbarContainer.style.display === 'none' || toolbarContainer.style.display === '') {
+            toolbarContainer.style.display = 'flex'; // Mostrar el listado de botones
+          } else {
+            toolbarContainer.style.display = 'none'; // Ocultar el listado de botones
+          }
+        });
+
+        // Cerrar el toolbar si se hace clic fuera de él
+        document.addEventListener('click', function (event) {
+          var toolbar = document.getElementById('toolbarContainer');
+          var redlineToggle = document.getElementById('redlineToggle');
+          if (!toolbar.contains(event.target) && !redlineToggle.contains(event.target)) {
+            toolbar.style.display = 'none';
+          }
+        });
+
+        // Mostrar el modal al hacer clic en el botón de configuración
+        document.getElementById('configTokenToggle').addEventListener('click', function () {
+          document.getElementById('configModal').classList.add('is-active');
+        });
+
+        // Función para cerrar el modal
+        function closeConfigModal() {
+          document.getElementById('configModal').classList.remove('is-active');
+        }
+
+        // Guardar el nuevo token en el archivo default.json
+        function saveNewToken() {
+          const newToken = document.getElementById('newCesiumToken').value;
+
+          fetch('/3d/api/save-ion-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: newToken })
+          })
+            .then(response => response.json())
+            .then(data => {
+              alert(data.message); // Mostrar mensaje de éxito
+              closeConfigModal(); // Cerrar el modal
+            })
+            .catch(error => console.error('Error saving Cesium token:', error));
+        }
+
+
+      </script>
+
+      <script>
+        var userRole = "<%= userRole %>";
+      </script>
+
+
+</body>
+
+</html>
