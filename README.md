@@ -16,11 +16,14 @@ This project is licensed under the [Mozilla Public License 2.0](https://mozilla.
 The open source version of MGIS 3D-Planner provides basic functionality. For advanced features, including additional tools and premium support, consider [MGIS 3D-Planner Plus](https://mundogis.eu/3dplannerplus).
 
 ## Overview
-MGIS 3D-Planner is a powerful platform for rural and urban design, development, and real estate planning. Built with Cesium JS technology, it enables users to design and visualize projects while understanding their real-time impact. 
+
+
+MGIS 3D-Planner is a powerful platform for rural and urban design, development, and real estate planning. Built with CesiumJS technology, it enables users to design and visualize projects while understanding their real-time impact.
 
 In addition to urban planning, MGIS 3D-Planner can be used to plan and visualize wind and solar parks, as well as other types of land-based projects.
 
 MGIS 3D-Planner is built with **Node.js**, **Express**, and **CesiumJS**.
+
 
 ## Installation
 To install MGIS 3D-Planner, follow these steps:
