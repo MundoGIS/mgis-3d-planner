@@ -1,8 +1,7 @@
 # Dependencias de Node.js
 node_modules/
 
-# Archivos de entorno
-.env
+
 
 # Archivos de registro
 logs/

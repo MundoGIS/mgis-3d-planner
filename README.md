@@ -30,7 +30,12 @@ To install MGIS 3D-Planner, follow these steps:
 3. Navigate to the project directory and install dependencies by running:
    ```bash
    npm install
-4. Update the default admin user credentials in app.js. The default credentials are:
+4. Open the .env file and assign appropriate values to each variable:
+
+SESSION_SECRET=your_session_secret_here
+JWT_SECRET=your_jwt_secret_here
+
+5. Update the default admin user credentials in app.js. The default credentials are:
 Username: admin
 Password: admin
 
