@@ -696,7 +696,7 @@ function loadCzmlLayer(layer) {
 
 async function loadGltfLayer(layer) {
   console.log("Loading GLTF layer:", layer.name);
-  const geoJsonPath = `/dxf-geojson/${layer.gltfName.replace('.gltf', '.geojson')}`;
+  const geoJsonPath = `/geojson-conf/${layer.gltfName.replace('.gltf', '.geojson')}`;
   const gltfPath = `/3d/${layer.gltfName}`;
 
   try {

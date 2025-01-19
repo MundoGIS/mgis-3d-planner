@@ -10,8 +10,23 @@
         "isBaseLayer": true,
         "key": 1726655123501,
         "visible": true
+      },
+      {
+        "name": "Wind",
+        "type": "gltf",
+        "visible": true,
+        "gltfName": "Enercon_E70_70m.gltf",
+        "key": 1737283331931
       }
     ],
-    "terrains": []
+    "terrains": [
+      {
+        "key": "1737282400123",
+        "name": "World terrain",
+        "url": "https://assets.cesium.com/1/tileset.json",
+        "type": "ion",
+        "visible": true
+      }
+    ]
   }
 }

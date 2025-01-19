@@ -70,7 +70,7 @@ app.use('/CesiumIkons',  isAuthenticated, express.static(path.join(__dirname, 'n
 app.use('/Tiles/', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '3d', '3dtiles')));
 app.use('/3d/', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '3d')));
 app.use('/2d/', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '2d')));
-app.use('/dxf-geojson/', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '3d', 'dxf-geojson')));
+app.use('/geojson-conf/', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '3d', 'geojson-conf')));
 app.use('/terrain', isAuthenticated, express.static(path.join(__dirname, 'data', 'uploaded', '3d', 'terrain')));
 
 // Ruta protegida para servir archivos de la carpeta terrain
