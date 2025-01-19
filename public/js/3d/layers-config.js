@@ -717,10 +717,6 @@ async function loadGltfLayer(layer) {
     const modelPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
     let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(modelPosition);
 
-    // Aplicar la escala
-    const scale = properties.scale || 1;
-    Cesium.Matrix4.multiplyByUniformScale(modelMatrix, scale, modelMatrix);
-
     // Aplicar rotaciones: horizontal (Z), vertical (X), lateral (Y)
     const hRotation = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(properties.horizontalRotation || 0));
     const vRotation = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(properties.verticalRotation || 0));
@@ -737,11 +733,12 @@ async function loadGltfLayer(layer) {
     const loadedModel = await Cesium.Model.fromGltfAsync({
       url: gltfPath,
       modelMatrix: modelMatrix,
-      clampToGround: true,
-      minimumPixelSize: properties.minimumPixelSize || 128
+      scale: 1.0, // Mantiene la escala original del modelo
+      minimumPixelSize: 0.0, // Evita el escalado automático basado en el tamaño en pantalla
+      clampToGround: true // Asegura que el modelo se ajuste al terreno
     });
 
-    // Asignar la visibilidad real
+    // Asignar la visibilidad inicial
     const initialShow = (typeof layer.visible === 'boolean') ? layer.visible : false;
     loadedModel.show = initialShow;
 
@@ -758,11 +755,12 @@ async function loadGltfLayer(layer) {
     // Ajustar texturas y filtros cuando el modelo esté listo
     await loadedModel.readyPromise;
     adjustModelTextures(loadedModel);
-    console.log(`Textures adjusted for GLTF layer "${layer.name}".`);
+    console.log(`GLTF layer loaded and textures adjusted: ${layer.name}`);
   } catch (error) {
     console.error('Error loading GLTF/GLB file:', error);
   }
 }
+
 
 
 

@@ -6,14 +6,14 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          17.89144791983998,
-          59.2983291791327,
-          72.29095995310159
+          17.891447999999993,
+          59.298328999999995,
+          72.27999999904249
         ]
       },
       "properties": {
         "name": "Enercon_E70_70m",
-        "scale": 1,
+        "scale": 40,
         "minimumPixelSize": 128,
         "horizontalRotation": 0,
         "verticalRotation": 0,
