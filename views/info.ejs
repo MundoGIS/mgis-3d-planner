@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
   <%- include('./layouts/head'); -%>
+  <style>
+    .content.has-text-left {
+      text-align: left;
+    }
+    .content p {
+      margin-bottom: 1em;
+    }
+  </style>
 </head>
 <body>
     <% if (isAuthenticated && userRole==='admin') { %>
@@ -10,68 +18,17 @@
         </header>
     <% } %>
 
-  <section class="section" id="showcase">
-      <div class="container has-text-centered">
-          <h1 class="title is-1">Advanced GIS Solutions</h1>
-          <p class="subtitle is-4">Transform your geospatial data management with our comprehensive suite of tools</p>
-          <a href="#" class="button is-primary is-medium">Learn More</a>
-      </div>
-  </section>
-
-  <section class="section">
+  <section class="section" style="padding: 30px;margin: 30px;">
       <div class="container">
-          <div class="columns is-multiline">
-              <div class="column is-one-third">
-                  <div class="box">
-                      <h2 class="title is-4">3D Mapping with Cesium</h2>
-                      <p>MGIS 3D-Planner utilizes <a href="https://cesium.com/" target="_blank">CesiumJS</a> for advanced 3D visualization, allowing you to:</p>
-                      <ul>
-                          <li>Render 3D Tiles for large-scale geospatial datasets.</li>
-                          <li>Measure distances and areas directly on the map.</li>
-                          <li>Visualize real-world terrains and integrate Cesium Ion assets.</li>
-                          <li>Create, edit, and save 3D maps for planning and analysis.</li>
-                      </ul>
-                      <p>With Cesium's powerful engine, you can bring your geospatial data to life, enhancing planning and decision-making processes.</p>
-                  </div>
-              </div>
-              <div class="column is-one-third">
-                  <div class="box">
-                      <h2 class="title is-4">QGIS-Server Manager</h2>
-                      <p>QGIS-Server Manager is a cutting-edge application designed to simplify the administration of <a href="https://qgis.org" target="_blank">QGIS Server</a>. It offers a user-friendly interface to:</p>
-                      <ul>
-                          <li>Seamlessly manage WMS, WFS, and WMTS projects.</li>
-                          <li>Upload and configure layers, styles, and services efficiently.</li>
-                          <li>Optimize map performance for high-demand environments.</li>
-                          <li>Enable secure and collaborative sharing of geospatial data.</li>
-                      </ul>
-                      <p>Stay tuned for more updates and detailed information about QGIS-Server Manager.</p>
-                  </div>
-              </div>
-              <div class="column is-one-third">
-                  <div class="box">
-                      <h2 class="title is-4">Origo Map Plus</h2>
-                      <p>Origo Map Plus is an intuitive application tailored for the efficient management of <a href="https://origo-map.github.io/" target="_blank">Origo maps</a>. Designed to eliminate the need for coding, it empowers users to:</p>
-                      <ul>
-                          <li>Edit and update Origo maps and configurations effortlessly.</li>
-                          <li>Implement real-time map adjustments for immediate results.</li>
-                          <li>Integrate seamlessly with other GIS tools and workflows.</li>
-                          <li>Enhance productivity with a streamlined map management process.</li>
-                      </ul>
-                      <p>Detailed information and updates on Origo Map Plus will be available soon.</p>
-                  </div>
-              </div>
-          </div>
-      </div>
-  </section>
-
-  <section class="section">
-      <div class="container">
-          <div class="content has-text-centered">
-              <h2 class="title is-3">Contact Us</h2>
-              <p>We offer commercial consulting on MGIS 3D-Planner and other open source applications like QGIS Server, GeoServer, GeoWebCache, PostGIS, 3D Cesium, and more.</p>
+          <div class="content has-text-left">
+              <h2 class="title is-3">About MundoGIS</h2>
+              <p>We specialize in delivering high-quality training, workshops, and consulting services, with a focus on open-source GIS solutions. Additionally, we develop advanced software tools designed to enhance workflows in 2D and 3D GIS environments.</p>
+              <p>Whether you or your organization require expert guidance in geospatial data management, GIS analysis, 3D visualization, or customized GIS development, MundoGIS is here to provide tailored solutions to meet your needs.</p>
               <p>If you have any questions or need further information, feel free to reach out to us:</p>
               <p>Email: <a href="mailto:abel.gonzalez@mundogis.eu">abel.gonzalez@mundogis.eu</a></p>
-              <p>Website: <a href="https://mundogis.eu/?page_id=11" target="_blank">Contact Us</a></p>
+              <p>
+                  <a href="https://mundogis.eu/?page_id=11" target="_blank" class="button is-primary is-medium">Contact us</a>
+              </p>
           </div>
       </div>
   </section>
