@@ -17,13 +17,33 @@ The open source version of MGIS 3D-Planner provides basic functionality. For adv
 
 ## Overview
 
+MGIS-3D-Planner is a Geographic Information System (GIS) tool designed for the visualization and management of spatial data in 3D. It enables engineers and decision-makers to effectively create scenes that provide a clearer understanding of how a future urban area might appear. Beyond urban projects, it also adapts to the visualization of wind and solar parks, as well as other types of areas. 
+GITHUB
 
-MGIS 3D-Planner is a powerful platform for rural and urban design, development, and real estate planning. Built with CesiumJS technology, it enables users to design and visualize projects while understanding their real-time impact.
+# Key features of MGIS-3D-Planner include:
 
-In addition to urban planning, MGIS 3D-Planner can be used to plan and visualize wind and solar parks, as well as other types of land-based projects.
+# Backend:
+
+1- User registration and creation system.
+2- Capability to upload and store spatial data in formats such as JPEG, PNG, CZML, GLTF, 3D-Tiles, KML, KMZ, and terrains in Quantized-Mesh. Additionally, it allows adding terrains from the Cesium Ion platform.
+3- Ability to position GLTF models on the terrain.
+4- Functionality to serve GLTF models and images as links that can be used externally.
+
+# Frontend: 
+
+The frontend displays a Cesium map with a wide range of functions, enabling users to perform various operations according to their objectives. Some of the functions include:
+
+1- Tools for measuring distance and area.
+2- Option to add the Cesium Ion token to access terrains in Cesium Ion.
+3- Widgets to manage 3D layers, background, and terrains.
+4- Map printing tool with various format adjustment options.
+5- Tools for drawing lines, polygons, circles, 3D objects, and adding temporary GLTF models. The GLTF models must be previously uploaded to the backend to be available on the 3D map of the frontend.
+6- Ability to add clouds anywhere on the map, adjustable in color, height, shape, and size.
+7- Option to enable and disable shadows, as well as show and hide the Cesium clock and timeline.
+8- In addition to adding all local data uploaded by the administrator in the backend, the frontend also allows adding terrains from Cesium Ion and background layers from different sources.
+
 
 MGIS 3D-Planner is built with **Node.js**, **Express**, and **CesiumJS**.
-
 
 ## Installation
 To install MGIS 3D-Planner, follow these steps:
