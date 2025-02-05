@@ -1,3 +1,5 @@
+let cesiumViewer;
+
 // Ajustes de extensiones por tipo
 const acceptFormats = {
   '2d': ['.jpeg', '.jpg', '.png', '.geotif', '.tiff'],
@@ -7,6 +9,44 @@ const acceptFormats = {
 };
 
 document.addEventListener('DOMContentLoaded', async function () {
+
+  const depthTestToggle = document.getElementById('depthTestToggle');
+      if (depthTestToggle) {
+        depthTestToggle.checked = false;
+      }
+
+  function toggleDepthTestAgainstTerrain(enabled) {
+    // Para el globo
+    cesiumViewer.scene.globe.depthTestAgainstTerrain = enabled;
+
+    // Para el modelo GLTF
+    if (model) {
+      model.depthTestAgainstTerrain = enabled;
+    }
+
+    // Para el tileset 3D Tiles
+    if (currentTileset) {
+      currentTileset.depthTestAgainstTerrain = enabled;
+    }
+  }
+
+  function toggleDepthTest(enabled) {
+    // Esto controla el globo (terreno)
+    cesiumViewer.scene.globe.depthTestAgainstTerrain = enabled;
+
+    // Esto controla los modelos GLTF/GLB
+    if (model) {
+      model.depthTestAgainstTerrain = enabled;
+    }
+
+    // Esto controla un tileset (si lo has guardado en una variable global)
+    if (currentTileset) {
+      currentTileset.depthTestAgainstTerrain = enabled;
+    }
+  }
+
+
+
   // Elementos del DOM
   const fileInput = document.getElementById('fileInput');
   const radios = document.querySelectorAll('input[name="uploadType"]');
@@ -27,6 +67,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   const uploadButton = document.getElementById('uploadButton');
   const tilesetSelect = document.getElementById('tilesetSelect');
 
+
+
   // Botón para copiar link
   const copyLinkButton = document.getElementById('copyLinkButton');
   copyLinkButton.addEventListener('click', copyDataLink);
@@ -37,6 +79,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   let minimumPixelSize = 128;
   let isLocked = false;
   let isClampToGround = false;
+  let currentTileset;
 
   function showCopyLinkButton() {
     const copyLinkButton = document.getElementById('copyLinkButton');
@@ -80,24 +123,18 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function showCoordinateTable() {
-    const coordTable= document.getElementById('coordinateTable');
+    const coordTable = document.getElementById('coordinateTable');
     if (coordTable) {
       coordTable.style.display = 'block';
     }
   }
 
   function hideCoordinateTable() {
-    const coordTable= document.getElementById('coordinateTable');
+    const coordTable = document.getElementById('coordinateTable');
     if (coordTable) {
       coordTable.style.display = 'none';
     }
   }
-
-
-
-  
-
-
 
 
   // 1) Configurar "accept" según el radio seleccionado
@@ -217,72 +254,81 @@ document.addEventListener('DOMContentLoaded', async function () {
   loadLocal3DTiles();
 
   // 6) Configurar el manejador de selección de terrenos
-  terrainSelect.addEventListener('change', async function () {
-    const selectedTerrain = terrainSelect.value;
+  // 6) Configurar el manejador de selección de terrenos
+terrainSelect.addEventListener('change', async function () {
+  const selectedTerrain = terrainSelect.value;
 
-    if (!cesiumViewer) {
-      console.error('Cesium viewer is not initialized');
-      showMessage('Cesium viewer is not initialized.', 'is-danger');
-      return;
-    }
+  if (!cesiumViewer) {
+    console.error('Cesium viewer is not initialized');
+    showMessage('Cesium viewer is not initialized.', 'is-danger');
+    return;
+  }
 
-    // Resetea cualquier terreno actual al predeterminado
+  // Resetea cualquier terreno actual al predeterminado
+  cesiumViewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+
+  if (selectedTerrain === 'cesiumIon') {
+    // 1) Opción "Flat Terrain" => usar el elipsoide plano
     cesiumViewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+    console.log('Using flat ellipsoid terrain.');
+    showMessage('Using flat ellipsoid terrain.', 'is-success');
 
-    if (selectedTerrain.startsWith('Ion Terrain: ')) {
-      // Manejo de terrenos de Ion
-      const assetIdStr = selectedTerrain.split(':')[1]?.trim();
-      const assetId = parseInt(assetIdStr, 10);
+  } else if (selectedTerrain.startsWith('Ion Terrain: ')) {
+    // 2) Manejo de terrenos Ion con assetId
+    const assetIdStr = selectedTerrain.split(':')[1]?.trim();
+    const assetId = parseInt(assetIdStr, 10);
 
-      if (!isNaN(assetId)) {
-        try {
-          const terrainProvider = new Cesium.CesiumTerrainProvider({
-            url: await Cesium.IonResource.fromAssetId(assetId),
-            requestVertexNormals: true,
-            requestWaterMask: true,
-          });
-          cesiumViewer.scene.terrainProvider = terrainProvider;
-          console.log(`Cesium Ion Terrain loaded with assetId: ${assetId}`);
-          showMessage(`Ion Terrain "${selectedTerrain}" loaded successfully.`, 'is-success');
-        } catch (error) {
-          console.error(`Error loading Cesium Ion Terrain with assetId ${assetId}:`, error);
-          showMessage('Failed to load Cesium Ion Terrain. Please check the assetId or your Ion token.', 'is-danger');
-        }
-      } else {
-        console.error('Invalid Ion Terrain assetId');
-        showMessage('Invalid Ion Terrain assetId. Please select a valid terrain.', 'is-danger');
+    if (!isNaN(assetId)) {
+      try {
+        const terrainProvider = new Cesium.CesiumTerrainProvider({
+          url: await Cesium.IonResource.fromAssetId(assetId),
+          requestVertexNormals: true,
+          requestWaterMask: true,
+        });
+        cesiumViewer.scene.terrainProvider = terrainProvider;
+        console.log(`Cesium Ion Terrain loaded with assetId: ${assetId}`);
+        showMessage(`Ion Terrain "${selectedTerrain}" loaded successfully.`, 'is-success');
+      } catch (error) {
+        console.error(`Error loading Cesium Ion Terrain with assetId ${assetId}:`, error);
+        showMessage('Failed to load Cesium Ion Terrain. Please check the assetId or your Ion token.', 'is-danger');
       }
-
-    } else if (selectedTerrain.startsWith('Local Terrain: ')) {
-      // Manejo de terrenos locales
-      const terrainName = selectedTerrain.replace('Local Terrain: ', '').trim();
-
-      if (terrainName) {
-        try {
-          const terrainProvider = new Cesium.CesiumTerrainProvider({
-            url: `/terrain/${terrainName}/`, // Asegúrate de que termina con "/"
-            requestVertexNormals: true,
-            requestWaterMask: true,
-          });
-          cesiumViewer.scene.terrainProvider = terrainProvider;
-          console.log(`Local Terrain loaded: /terrain/${terrainName}/`);
-          showMessage(`Local Terrain "${terrainName}" loaded successfully.`, 'is-success');
-        } catch (error) {
-          console.error(`Error loading Local Terrain: ${terrainName}`, error);
-          showMessage('Failed to load local terrain. Please check the terrain folder structure.', 'is-danger');
-        }
-      } else {
-        console.error('Invalid Local Terrain name');
-        showMessage('Invalid Local Terrain name. Please select a valid terrain.', 'is-danger');
-      }
-
     } else {
-      console.warn('Unknown terrain selection');
-      showMessage('Unknown terrain selection. Please choose a valid option.', 'is-warning');
+      console.error('Invalid Ion Terrain assetId');
+      showMessage('Invalid Ion Terrain assetId. Please select a valid terrain.', 'is-danger');
     }
-  });
 
-  // Funciones auxiliares
+  } else if (selectedTerrain.startsWith('Local Terrain: ')) {
+    // 3) Manejo de terrenos locales
+    const terrainName = selectedTerrain.replace('Local Terrain: ', '').trim();
+
+    if (terrainName) {
+      try {
+        const terrainProvider = new Cesium.CesiumTerrainProvider({
+          url: `/terrain/${terrainName}/`, // Asegúrate de que termina con "/"
+          requestVertexNormals: true,
+          requestWaterMask: true,
+        });
+        cesiumViewer.scene.terrainProvider = terrainProvider;
+        console.log(`Local Terrain loaded: /terrain/${terrainName}/`);
+        showMessage(`Local Terrain "${terrainName}" loaded successfully.`, 'is-success');
+      } catch (error) {
+        console.error(`Error loading Local Terrain: ${terrainName}`, error);
+        showMessage('Failed to load local terrain. Please check the terrain folder structure.', 'is-danger');
+      }
+    } else {
+      console.error('Invalid Local Terrain name');
+      showMessage('Invalid Local Terrain name. Please select a valid terrain.', 'is-danger');
+    }
+
+  } else {
+    // 4) Si no coincide con nada
+    console.warn('Unknown terrain selection');
+    showMessage('Unknown terrain selection. Please choose a valid option.', 'is-warning');
+  }
+});
+
+
+
 
   // Función para cargar los terrenos locales
   function loadLocalTerrains() {
@@ -426,7 +472,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     const coordTable = document.querySelector('.coordinate-table');
     if (coordTable) coordTable.style.display = 'block';
-   
+
   }
 
   function viewImage(fileName) {
@@ -627,9 +673,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         loadCZMLFile(filePath);
       } else if (fileName.toLowerCase().endsWith('.kml') ||
         fileName.toLowerCase().endsWith('.kmz')) {
-          hideCoordinateTable()
-          showTerrainTable()
-          hideLockButton()
+        hideCoordinateTable()
+        showTerrainTable()
+        hideLockButton()
         loadKMLFile(filePath);
       }
     }
@@ -644,20 +690,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     closeModal();
     currentDataLink = null;
     hideCopyLinkButton();
-    hideTerrainTable()
-    hideLockButton() 
-    hideCoordinateTable()
+    hideTerrainTable();
+    hideLockButton();
+    hideCoordinateTable();
     modal.style.display = "block";
     initializeViewer();
 
     // Extraer el nombre del terreno sin la extensión
-    let terrainName;
-    if (fileName.includes('.')) {
-      terrainName = fileName.substring(0, fileName.lastIndexOf('.'));
-    } else {
-      terrainName = fileName;
-    }
-    console.log('terrainName:', terrainName); // Verificar que terrainName está correcto
+    let terrainName = fileName.includes('.')
+      ? fileName.substring(0, fileName.lastIndexOf('.'))
+      : fileName;
+    console.log('terrainName:', terrainName);
 
     try {
       const terrainProvider = new Cesium.CesiumTerrainProvider({
@@ -668,6 +711,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       cesiumViewer.scene.terrainProvider = terrainProvider;
       console.log(`Local Terrain loaded: /terrain/${terrainName}/`);
       showMessage(`Local Terrain "${terrainName}" loaded successfully.`, 'is-success');
+
+      // Verificar que la prueba de profundidad esté activada
+      console.log("depthTestAgainstTerrain (globe):", cesiumViewer.scene.globe.depthTestAgainstTerrain);
 
       // Actualizar el dropdown para reflejar el terreno seleccionado
       const dropdown = document.getElementById('terrainSelect');
@@ -686,9 +732,7 @@ document.addEventListener('DOMContentLoaded', async function () {
           return response.json();
         })
         .then(extent => {
-          console.log('Fetched terrain extent:', extent); // Verificar el contenido del extent
-
-          // extent debe tener las propiedades west, south, east, north en grados
+          console.log('Fetched terrain extent:', extent);
           const rectangle = Cesium.Rectangle.fromDegrees(extent.west, extent.south, extent.east, extent.north);
           cesiumViewer.camera.flyTo({
             destination: rectangle,
@@ -700,7 +744,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         })
         .catch(error => {
           console.error('Error fetching terrain extent:', error);
-          // Si no se puede obtener el extent, hacer flyTo a una posición predeterminada
           cesiumViewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(0, 0, 10000000),
             duration: 2
@@ -708,14 +751,14 @@ document.addEventListener('DOMContentLoaded', async function () {
           showMessage('Error fetching terrain extent. Zooming to default location.', 'is-warning');
         });
 
-      // Deshabilitar configuraciones ya que no son aplicables a terrenos
       disableModelConfiguration();
     } catch (error) {
       console.error(`Error loading Local Terrain: ${terrainName}`, error);
       showMessage('Failed to load local terrain. Please check the terrain folder structure.', 'is-danger');
     }
   }
-  
+
+
 
   // Función para ver 3D Tiles
   function viewTiles(folderName) {
@@ -723,7 +766,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     closeModal();
     currentDataLink = null;
     hideCopyLinkButton();
-    hideLockButton() 
+    hideLockButton()
     hideCoordinateTable();
     showTerrainTable();
     modal.style.display = "block";
@@ -733,6 +776,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Cargar el tileset en Cesium
     const tileset = new Cesium.Cesium3DTileset({ url: tilesetUrl });
+    tileset.depthTestAgainstTerrain = true; // Habilitar la prueba de profundidad para los 3D Tiles
+    currentTileset = tileset;
 
     // Agregarlo a la escena y, cuando esté listo, hacer un zoom 
     cesiumViewer.scene.primitives.add(tileset);
@@ -763,47 +808,62 @@ document.addEventListener('DOMContentLoaded', async function () {
         vrButton: false,
         baseLayerPicker: true,
         navigationHelpButton: false,
-        shadows: false, // Desactiva sombras para que siempre parezca de día
+        shadows: false,
         shouldAnimate: true,
         animation: false,
         sceneModePicker: false,
         fullscreenButton: false,
         sceneMode: Cesium.SceneMode.SCENE3D,
-        terrainShadows: Cesium.ShadowMode.DISABLED, // Desactiva sombras en el terreno
+        terrainShadows: Cesium.ShadowMode.DISABLED,
         homeButton: false,
       });
 
+      
+
+      cesiumViewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+
+
+      // Configurar depthTestAgainstTerrain para el globo
+      cesiumViewer.scene.globe.depthTestAgainstTerrain = false;
+
+
+      // Configurar depthTestAgainstTerrain para modelos y tilesets
+      cesiumViewer.scene.globe.show = true;
+      cesiumViewer.scene.globe.translucency.enabled = false;
+      cesiumViewer.scene.requestRender();
+
       const scene = cesiumViewer.scene;
-      scene.globe.show = true; // Asegurarnos de que se muestre el globo.
-      scene.globe.translucency.enabled = false; // Desactivar translucidez (en Cesium >= 1.93).
-      scene.globe.showGroundAtmosphere = false; // Quita la "niebla" atmosférica sobre el suelo (opcional).
-      scene.globe.baseColor = Cesium.Color.DARKGRAY; // O el color que quieras
-      scene.globe.depthTestAgainstTerrain = true; // Para que se oculte lo que está debajo
+      scene.globe.show = true;
+      scene.globe.translucency.enabled = false;
+      scene.globe.showGroundAtmosphere = false;
+      scene.globe.baseColor = Cesium.Color.DARKGRAY;
+      scene.globe.depthTestAgainstTerrain = true;
+      scene.globe.enableLighting = false;
+      scene.sun.show = true;
+      scene.moon.show = true;
+      scene.highDynamicRange = true;
+      scene.skyBox.show = false;
+
       scene.requestRender();
 
-      // Desactiva el ciclo diurno para que siempre sea de día
-      scene.globe.enableLighting = false; // Activa la iluminación global
-      scene.sun.show = true; // Muestra el sol
-      scene.moon.show = true; // Muestra la luna
-      scene.highDynamicRange = true; // Habilita HDR
-      scene.skyBox.show = false; // Oculta el cielo predeterminado si es necesario
-      scene.globe.baseColor = Cesium.Color.DARKGRAY;
-
       scene.light = new Cesium.DirectionalLight({
-        direction: new Cesium.Cartesian3(-1, -1, -1), // Ajusta la dirección de la luz
-        intensity: 2.0 // Reduce la intensidad de la luz
+        direction: new Cesium.Cartesian3(-1, -1, -1),
+        intensity: 2.0
       });
 
-      scene.skyAtmosphere.show = true; // Muestra la atmósfera
-      cesiumViewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date(Date.UTC(2024, 6, 1, 12))); // Hora fija al mediodía
-      cesiumViewer.clock.shouldAnimate = false; // Desactiva animación del reloj
+      scene.skyAtmosphere.show = true;
+      cesiumViewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date(Date.UTC(2025, 1, 1, 12)));
+      cesiumViewer.clock.shouldAnimate = false;
 
-      enableDragDrop(); // Habilitar la funcionalidad de arrastrar y soltar
-      setScreenSpaceEventHandlers(); // Configurar los manejadores de eventos de la pantalla
+      enableDragDrop();
+      setScreenSpaceEventHandlers();
 
-      // Event handler para actualizar la altura del terreno
       const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
       handler.setInputAction(updateTerrainHeight, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+      if (terrainSelect) {
+        terrainSelect.value = "cesiumIon";
+      }
     }
   }
 
@@ -901,6 +961,8 @@ document.addEventListener('DOMContentLoaded', async function () {
           clampToGround: isClampToGround,
           enableDracoDecompression: true
         }).then(loadedModel => {
+          loadedModel.depthTestAgainstTerrain = true;
+
           cesiumViewer.scene.primitives.add(loadedModel);
           cesiumViewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, height + 500),
