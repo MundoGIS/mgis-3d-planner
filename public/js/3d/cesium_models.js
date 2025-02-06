@@ -822,6 +822,19 @@ terrainSelect.addEventListener('change', async function () {
 
       cesiumViewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider();
 
+      if (Cesium.viewerCesiumNavigationMixin) {
+        const options = {
+          defaultResetView: Cesium.Rectangle.fromDegrees(10, 55, 24, 69),
+          enableCompass: true,
+          enableZoomControls: true,
+          enableDistanceLegend: true,
+          enableCompassOuterRing: true,
+        };
+        cesiumViewer.extend(Cesium.viewerCesiumNavigationMixin, options);
+      } else {
+        console.warn("Cesium Navigation Mixin is not loaded.");
+      }
+
 
       // Configurar depthTestAgainstTerrain para el globo
       cesiumViewer.scene.globe.depthTestAgainstTerrain = false;

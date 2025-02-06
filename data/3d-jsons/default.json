@@ -26,6 +26,13 @@
         "url": "https://assets.cesium.com/1/tileset.json",
         "type": "ion",
         "visible": true
+      },
+      {
+        "key": "1738828858967",
+        "name": "ssdfdf",
+        "url": "https://assets.cesium.com/1/tileset.json",
+        "type": "ion",
+        "visible": true
       }
     ]
   }

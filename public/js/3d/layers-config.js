@@ -22,8 +22,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
-
-
 function ensureCesiumToken() {
   if (!Cesium.Ion.defaultAccessToken) {
     throw new Error("Cesium Ion token is not configured. Please check your default.json file.");
@@ -1272,7 +1270,7 @@ async function addLayerDialog() {
       const data = await response.json();
       gltfSelect.innerHTML = data.files3D.map(file => `<option value="${file.name}">${file.name}</option>`).join('');
     } catch (error) {
-      console.error('Error cargando archivos GLTF:', error);
+      console.error('Error loading GLTF files:', error);
     }
   }
   // Función para cargar terrenos locales (carpetas) SIN buscar terrain.json
@@ -1281,7 +1279,7 @@ async function addLayerDialog() {
       // Ajusta la ruta al endpoint que listará TODAS las subcarpetas
       const response = await fetch('/3d/api/terrain-files');
       if (!response.ok) {
-        throw new Error('Error al obtener la lista de terrenos locales.');
+        throw new Error('Error retrieving the list of local terrains.');
       }
       const terrains = await response.json();
 
@@ -1291,12 +1289,12 @@ async function addLayerDialog() {
           .map(terrain => `<option value="${terrain.url}">${terrain.name}</option>`)
           .join('');
       } else {
-        terrainDropdown.innerHTML = `<option value="">No hay terrenos disponibles para agregar</option>`;
+        terrainDropdown.innerHTML = `<option value="">No land available to add</option>`;
       }
     } catch (error) {
       console.error('Error loading terrain options:', error);
       const terrainDropdown = document.getElementById('localTerrainDropdown');
-      terrainDropdown.innerHTML = `<option value="">Error al cargar terrenos</option>`;
+      terrainDropdown.innerHTML = `<option value="">Error when loading terrain</option>`;
     }
   }
 
@@ -1310,15 +1308,15 @@ async function addLayerDialog() {
       // Verifica si hay un token disponible
       if (data.token) {
         Cesium.Ion.defaultAccessToken = data.token;
-        console.log('Cesium Ion token configurado automáticamente.');
+        console.log('Cesium Ion token automatically configured.');
 
         // Cargar los activos de Ion
         await loadIonAssets(data.token);
       } else {
-        console.error('No se encontró un token de Cesium Ion en la configuración.');
+        console.error('No Cesium Ion token found in the configuration.');
       }
     } catch (error) {
-      console.error('Error al cargar el token de Cesium Ion:', error);
+      console.error('Error whean loading Cesium Ion Token:', error);
     }
   }
 
@@ -1349,7 +1347,7 @@ async function addLayerDialog() {
         ionAssetsSelect.innerHTML = `<option value="">No assets found</option>`;
       }
     } catch (error) {
-      console.error('Error cargando los activos de Cesium Ion:', error);
+      console.error('Error loading Cesium Ion files:', error);
     }
   }
 
@@ -1498,7 +1496,7 @@ async function addLayerDialog() {
 
       const data = await response.json();
       console.log('Terrain layer added successfully:', data);
-      alert(`Terreno "${layerConfig.name}" agregado exitosamente.`);
+      alert(`Terrain "${layerConfig.name}" successfully added.`);
       loadLayers(); // Recargar todas las capas y terrenos
     } catch (error) {
       console.error('Error adding terrain layer:', error);
@@ -1525,7 +1523,7 @@ async function addLayerDialog() {
 
       const data = await response.json();
       console.log('Layer added successfully:', data);
-      alert(`Capa "${layerConfig.name}" agregada exitosamente.`);
+      alert(`Layer "${layerConfig.name}" successfully added.`);
       loadLayers(); // Recargar todas las capas y terrenos
     } catch (error) {
       console.error('Error adding layer:', error);
@@ -1660,13 +1658,13 @@ async function saveSelectedTerrain(url) {
 
     const result = await response.json();
     if (result.message) {
-      console.log('Terreno seleccionado guardado exitosamente.');
+      console.log('Selected terrain saved successfully.');
     } else {
-      console.error('Error al guardar el terreno seleccionado:', result.error);
+      console.error('Error saving the selected terrain:', result.error);
     }
   } catch (error) {
-    console.error('Error al guardar el terreno seleccionado:', error.message || error);
-    alert('Error al guardar el terreno seleccionado: ' + error.message);
+    console.error('Error saving the selected terrain:', error.message || error);
+    alert('Error saving the selected terrain: ' + error.message);
   }
 }
 
