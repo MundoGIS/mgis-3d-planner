@@ -29,7 +29,15 @@ fetch('/3d/api/load-cesium-token')
       animation: true,
       sceneModePicker: false,
       shouldAnimate: true,
+      contextOptions: { 
+        webgl: { 
+          antialias: true 
+        }
+      }
+    
     });
+
+    
 
     cesiumViewer.scene.globe.depthTestAgainstTerrain = true;
 

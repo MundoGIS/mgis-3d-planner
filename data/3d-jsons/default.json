@@ -12,27 +12,29 @@
         "visible": true
       },
       {
-        "name": "Wind",
-        "type": "gltf",
-        "visible": true,
-        "gltfName": "Enercon_E70_70m.gltf",
-        "key": 1737283331931
+        "name": "Googles 3D",
+        "type": "3dtiles",
+        "id": "2275207",
+        "url": "https://assets.cesium.com/2275207/tileset.json",
+        "key": 1739371529111,
+        "visible": false
+      },
+      {
+        "name": "OSM buildings",
+        "type": "3dtiles",
+        "id": "96188",
+        "url": "https://assets.cesium.com/96188/tileset.json",
+        "key": 1739371602225,
+        "visible": false
       }
     ],
     "terrains": [
       {
-        "key": "1737282400123",
-        "name": "World terrain",
+        "key": "1739371436532",
+        "name": "Word terrain",
         "url": "https://assets.cesium.com/1/tileset.json",
         "type": "ion",
-        "visible": true
-      },
-      {
-        "key": "1738828858967",
-        "name": "ssdfdf",
-        "url": "https://assets.cesium.com/1/tileset.json",
-        "type": "ion",
-        "visible": true
+        "visible": false
       }
     ]
   }

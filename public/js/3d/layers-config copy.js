@@ -1,6 +1,6 @@
-let currentConfigName = 'default'; // Nombre de la configuración por defecto
+let currentConfigName = 'default'; // Default configuration name
 let selectedTerrain = null;
-//let loadedLayers = {}; // Almacenar capas cargadas
+//let loadedLayers = {}; // Store loaded layers
 let loadedTerrains = [];
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -22,61 +22,61 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 
-
 function ensureCesiumToken() {
   if (!Cesium.Ion.defaultAccessToken) {
-    throw new Error("Cesium Ion token no configurado. Verifica tu archivo default.json.");
+    throw new Error("Cesium Ion token is not configured. Please check your default.json file.");
   }
 }
 
+
 async function loadLayers(skipTerrainZoom = false) {
-  console.log('Cargando capas y terrenos...');
+  console.log('Loading layers and terrains...');
   try {
     const response = await fetch(`/3d/api/layers?config=${encodeURIComponent(currentConfigName)}`);
     if (!response.ok) {
-      throw new Error('Error al obtener las capas y terrenos.');
+      throw new Error('Error retrieving layers and terrains.');
     }
     const data = await response.json();
 
     if (data.cesiumToken && !Cesium.Ion.defaultAccessToken) {
       Cesium.Ion.defaultAccessToken = data.cesiumToken;
-      console.log('Cesium Ion token configurado desde default.json');
+      console.log('Cesium Ion token configured from default.json');
     }
 
     const layers = data.config.layers || [];
     const terrains = data.config.terrains || [];
 
-    loadedTerrains = terrains; // Almacenar terrenos con sus propiedades
+    loadedTerrains = terrains; // Store terrains with their properties
 
     renderLayers(layers);
     renderTerrains(terrains);
 
     if (!skipTerrainZoom) {
-      // Selecciona automáticamente el terreno marcado como visible
+      // Automatically select the terrain marked as visible
       const visibleTerrain = terrains.find(terrain => terrain.visible);
       if (visibleTerrain) {
         await selectTerrain(visibleTerrain.url);
       } else {
-        // Si no hay terrenos visibles, seleccionar 'flat'
+        // If no visible terrain is found, select 'flat'
         await selectTerrain('flat');
       }
     }
   } catch (error) {
-    console.error('Error al cargar las capas:', error);
+    console.error('Error loading layers:', error);
   }
 }
 
 
 function renderTerrains(terrains) {
-  console.log("Rendering terrains:", terrains); // Log para depuración
+  console.log("Rendering terrains:", terrains); // Debug log
 
   const terrainLayersList = document.getElementById("terrainLayersList");
   terrainLayersList.innerHTML = "";
 
-  // Determinar si algún terreno está seleccionado
+  // Check if any terrain is selected
   const hasSelectedTerrain = terrains.some(terrain => terrain.visible);
 
-  // Agregar la opción de "Flat Terrain" al inicio
+  // Add "Flat Terrain" option at the beginning
   const flatTerrainItem = document.createElement("div");
   flatTerrainItem.className = "layer-item";
   flatTerrainItem.innerHTML = `
@@ -87,15 +87,15 @@ function renderTerrains(terrains) {
   `;
   terrainLayersList.appendChild(flatTerrainItem);
 
-  // Renderizar los demás terrenos sin botones de zoom
+  // Render other terrains without zoom buttons
   terrains.forEach((terrain) => {
     const layerItem = document.createElement("div");
     layerItem.className = "layer-item";
 
-    // Determinar si el terreno está visible
+    // Determine if the terrain is visible
     const isSelected = terrain.visible ? "checked" : "";
 
-    // Botones de control (solo eliminar)
+    // Control buttons (delete only)
     const deleteButton =
       terrain.url !== "flat"
         ? `<i class="bx bx-trash" onclick="deleteItem('${terrain.name}', 'terrain')"></i>`
@@ -113,10 +113,11 @@ function renderTerrains(terrains) {
   });
 }
 
+
 function toggleLayerVisibility(layerName, isVisible) {
   console.log("Toggling visibility for layer:", layerName, "to", isVisible);
 
-  // Buscar la capa en loadedLayers de forma case-insensitive
+  // Search for the layer in loadedLayers case-insensitively
   const layerKey = Object.keys(loadedLayers).find(
     name => name.toLowerCase() === layerName.toLowerCase()
   );
@@ -133,11 +134,11 @@ function toggleLayerVisibility(layerName, isVisible) {
     return;
   }
 
-  // Actualizar visibilidad en loadedLayers
+  // Update visibility in loadedLayers
   layer.show = isVisible;
   layer.visible = isVisible;
 
-  // Actualizar visibilidad en Cesium
+  // Update visibility in Cesium
   if (layer.cesiumObject) {
     if (layer.cesiumObject instanceof Cesium.Cesium3DTileset || layer.cesiumObject instanceof Cesium.Model) {
       console.log(`Setting Cesium object show to ${isVisible} for layer "${layerName}"`);
@@ -158,18 +159,18 @@ function toggleLayerVisibility(layerName, isVisible) {
     console.warn(`Layer "${layerName}" does not have a cesiumObject.`);
   }
 
-  // Si es una capa base y se está activando, desactivar otras capas base
+  // If it's a base layer being activated, deactivate other base layers
   if (isVisible && layer.isBaseLayer) {
     Object.keys(loadedLayers).forEach(name => {
       const otherLayer = loadedLayers[name];
       if (otherLayer.isBaseLayer && name !== layerKey) {
         otherLayer.show = false;
-        otherLayer.visible = false; // Desactivar en JSON
+        otherLayer.visible = false; // Deactivate in JSON
 
-        // Actualizar la visibilidad en el servidor
+        // Update visibility on the server
         updateLayerVisibilityInConfig(name, false);
 
-        // Actualizar la visibilidad en Cesium
+        // Update visibility in Cesium
         if (otherLayer.cesiumObject) {
           if (otherLayer.cesiumObject instanceof Cesium.Cesium3DTileset || otherLayer.cesiumObject instanceof Cesium.Model) {
             console.log(`Setting Cesium object show to false for layer "${name}"`);
@@ -183,7 +184,7 @@ function toggleLayerVisibility(layerName, isVisible) {
           }
         }
 
-        // Actualizar los controles del widget (checkboxes/radios)
+        // Update widget controls (checkboxes/radios)
         const checkbox = document.getElementById(`${name}-checkbox`);
         const radio = document.getElementById(`${name}-radio`);
         if (checkbox) {
@@ -198,7 +199,7 @@ function toggleLayerVisibility(layerName, isVisible) {
     });
   }
 
-  // Actualizar en el servidor
+  // Update on the server
   updateLayerVisibilityInConfig(layerName, isVisible);
 
   console.log(`Layer "${layerName}" visibility set to ${isVisible}.`);
@@ -206,10 +207,11 @@ function toggleLayerVisibility(layerName, isVisible) {
 
 
 
+
 let visibilityUpdateQueue = Promise.resolve();
 
 async function updateLayerVisibilityInConfig(layerName, isVisible) {
-  // Agrega la actualización a la cola para evitar escrituras simultáneas
+  // Add the update to the queue to avoid simultaneous writes
   visibilityUpdateQueue = visibilityUpdateQueue.then(() => {
     return fetch(`/3d/api/update-layer-visibility`, {
       method: 'POST',
@@ -220,13 +222,13 @@ async function updateLayerVisibilityInConfig(layerName, isVisible) {
     })
       .then(response => {
         if (!response.ok) {
-          throw new Error('Layer not found on server');
+          throw new Error('Layer not found on the server');
         }
         return response.json();
       })
       .then(data => {
         if (data.message === 'Layer visibility updated successfully') {
-          console.log(`Layer ${layerName} visibility updated in config.`);
+          console.log(`Layer ${layerName} visibility successfully updated in the configuration.`);
         } else {
           console.error('Error updating layer visibility:', data.error);
         }
@@ -240,13 +242,14 @@ async function updateLayerVisibilityInConfig(layerName, isVisible) {
 
 
 
+
 function removeLayerFromMap(layerName) {
   const layer = loadedLayers[layerName];
 
   if (layer) {
     console.log(`Attempting to remove layer: ${layerName}`);
 
-    // Remover el objeto Cesium correspondiente según su tipo
+    // Remove the corresponding Cesium object based on its type
     if (layer.cesiumObject instanceof Cesium.Cesium3DTileset || layer.cesiumObject instanceof Cesium.Model) {
       cesiumViewer.scene.primitives.remove(layer.cesiumObject);
       console.log(`Primitive layer "${layerName}" removed.`);
@@ -260,7 +263,7 @@ function removeLayerFromMap(layerName) {
       console.warn(`Layer "${layerName}" has an unsupported Cesium object type. Unable to remove.`);
     }
 
-    // Eliminar la capa de loadedLayers
+    // Remove the layer from loadedLayers
     delete loadedLayers[layerName];
     console.log(`Layer "${layerName}" removed from loadedLayers.`);
   } else {
@@ -273,29 +276,29 @@ function renderLayers(layers) {
   const vectorLayersList = document.getElementById('vectorLayersList');
   const terrainLayersList = document.getElementById('terrainLayersList');
 
-  // Verificar que existan los elementos en el DOM
+  // Ensure the DOM elements exist
   if (!baseLayersList || !vectorLayersList || !terrainLayersList) {
     console.error("One or more layer lists are missing in the DOM.");
     return;
   }
 
-  // Limpiar las listas antes de volver a renderizar
+  // Clear the lists before re-rendering
   baseLayersList.innerHTML = '';
   vectorLayersList.innerHTML = '';
   terrainLayersList.innerHTML = '';
 
   layers.forEach((layer) => {
-    // Asegurarse de que 'layer.visible' sea booleano.
+    // Ensure 'layer.visible' is a boolean
     const isVisible = (typeof layer.visible === 'boolean') ? layer.visible : false;
 
-    // Sincronizar con layer.show (el que Cesium realmente usa)
-    layer.show = isVisible;  // Copiamos el valor original de layer.visible
+    // Sync with layer.show (used by Cesium)
+    layer.show = isVisible;
 
-    // Crear el contenedor HTML para esta capa
+    // Create the HTML container for this layer
     const layerItem = document.createElement('div');
-    layerItem.className = 'layer-item flex-container'; // Añadimos una clase para Flexbox
+    layerItem.className = 'layer-item flex-container'; // Add a class for Flexbox
 
-    // Lógica de botones (ej. eliminar)
+    // Logic for buttons (e.g., delete)
     let deleteButton = '';
     if (layer.name !== 'OpenStreetMap' && userRole === 'admin') {
       deleteButton = `
@@ -303,10 +306,10 @@ function renderLayers(layers) {
       `;
     }
 
-    // Botón de zoom
+    // Zoom button
     const zoomButton = `<i class="bx bx-search" onclick="zoomToLayer('${layer.name}')"></i>`;
 
-    // Contenedor para agrupar botones de zoom y eliminar
+    // Container to group zoom and delete buttons
     const buttonsContainer = `
       <div class="buttons-group">
         ${zoomButton}
@@ -314,9 +317,9 @@ function renderLayers(layers) {
       </div>
     `;
 
-    // Renderizado específico según el tipo de capa
+    // Specific rendering based on layer type
     if (layer.type === 'terrain') {
-      // Terrains => radios sin botones de zoom
+      // Terrain layers => radios without zoom buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -337,7 +340,7 @@ function renderLayers(layers) {
       terrainLayersList.appendChild(layerItem);
 
     } else if (layer.type === '3dtiles') {
-      // 3D Tiles => checkbox con botones agrupados
+      // 3D Tiles => checkbox with grouped buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -358,7 +361,7 @@ function renderLayers(layers) {
       vectorLayersList.appendChild(layerItem);
 
     } else if (layer.type === 'gltf') {
-      // GLTF => checkbox con botones agrupados
+      // GLTF => checkbox with grouped buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -379,7 +382,7 @@ function renderLayers(layers) {
       vectorLayersList.appendChild(layerItem);
 
     } else if (layer.type === 'czml') {
-      // CZML => checkbox con botones agrupados
+      // CZML => checkbox with grouped buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -400,7 +403,7 @@ function renderLayers(layers) {
       vectorLayersList.appendChild(layerItem);
 
     } else if (layer.isBaseLayer) {
-      // Capas base => radio sin botones de zoom
+      // Base layers => radios without zoom buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -421,7 +424,7 @@ function renderLayers(layers) {
       baseLayersList.appendChild(layerItem);
 
     } else {
-      // Capas normales => checkbox con botones agrupados
+      // Normal layers => checkbox with grouped buttons
       layerItem.innerHTML = `
         <div class="layer-left">
           <label>
@@ -441,19 +444,20 @@ function renderLayers(layers) {
       vectorLayersList.appendChild(layerItem);
     }
 
-    // Si la capa ya está cargada, simplemente actualizar su visibilidad
+    // If the layer is already loaded, simply update its visibility
     if (loadedLayers[layer.name]) {
-      // Actualizar la visibilidad de la capa cargada
+      // Update visibility of the loaded layer
       toggleLayerVisibility(layer.name, isVisible);
     } else {
-      // Cargar la capa en Cesium
+      // Load the layer into Cesium
       loadLayer(layer);
     }
   });
 
-  // Asegurarnos de reflejar en checkboxes/radios el valor de layer.show
+  // Ensure checkboxes/radios reflect the value of layer.show
   updateLayerVisibility();
 }
+
 
 
 
@@ -473,9 +477,6 @@ function updateLayerVisibility() {
     }
   });
 }
-
-
-
 
 async function load3DTileset(layer) {
   console.log(`Loading 3D Tileset for layer: ${layer.name}`);
@@ -693,7 +694,7 @@ function loadCzmlLayer(layer) {
 
 async function loadGltfLayer(layer) {
   console.log("Loading GLTF layer:", layer.name);
-  const geoJsonPath = `/dxf-geojson/${layer.gltfName.replace('.gltf', '.geojson')}`;
+  const geoJsonPath = `/geojson-conf/${layer.gltfName.replace('.gltf', '.geojson')}`;
   const gltfPath = `/3d/${layer.gltfName}`;
 
   try {
@@ -714,10 +715,6 @@ async function loadGltfLayer(layer) {
     const modelPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
     let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(modelPosition);
 
-    // Aplicar la escala
-    const scale = properties.scale || 1;
-    Cesium.Matrix4.multiplyByUniformScale(modelMatrix, scale, modelMatrix);
-
     // Aplicar rotaciones: horizontal (Z), vertical (X), lateral (Y)
     const hRotation = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(properties.horizontalRotation || 0));
     const vRotation = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(properties.verticalRotation || 0));
@@ -734,11 +731,12 @@ async function loadGltfLayer(layer) {
     const loadedModel = await Cesium.Model.fromGltfAsync({
       url: gltfPath,
       modelMatrix: modelMatrix,
-      clampToGround: true,
-      minimumPixelSize: properties.minimumPixelSize || 128
+      scale: 1.0, // Mantiene la escala original del modelo
+      minimumPixelSize: 0.0, // Evita el escalado automático basado en el tamaño en pantalla
+      clampToGround: true // Asegura que el modelo se ajuste al terreno
     });
 
-    // Asignar la visibilidad real
+    // Asignar la visibilidad inicial
     const initialShow = (typeof layer.visible === 'boolean') ? layer.visible : false;
     loadedModel.show = initialShow;
 
@@ -755,11 +753,12 @@ async function loadGltfLayer(layer) {
     // Ajustar texturas y filtros cuando el modelo esté listo
     await loadedModel.readyPromise;
     adjustModelTextures(loadedModel);
-    console.log(`Textures adjusted for GLTF layer "${layer.name}".`);
+    console.log(`GLTF layer loaded and textures adjusted: ${layer.name}`);
   } catch (error) {
     console.error('Error loading GLTF/GLB file:', error);
   }
 }
+
 
 
 
@@ -917,19 +916,19 @@ async function loadLayersFromConfig(configName) {
   try {
     const response = await fetch(`/3d/api/layers?config=${encodeURIComponent(configName)}`);
     if (!response.ok) {
-      throw new Error(`Error al obtener las capas para config "${configName}".`);
+      throw new Error(`Error fetching layers for config "${configName}".`);
     }
 
-    // Asumimos que el endpoint devuelve un array de capas
+    // Assuming the endpoint returns an array of layers
     const layers = await response.json();
 
-    // Si usas un osmLayerConfig, lo insertas si quieres que sea la capa base por defecto
-    // layers.unshift(osmLayerConfig); // <-- sólo si tu proyecto lo requiere
+    // If you use an osmLayerConfig, insert it if you want it to be the default base layer
+    // layers.unshift(osmLayerConfig); // <-- only if your project requires it
 
     console.log("Layers loaded from config:", layers);
     renderLayers(layers);
   } catch (error) {
-    console.error('Error al cargar las capas desde config:', error);
+    console.error('Error loading layers from config:', error);
   }
 }
 
@@ -945,11 +944,11 @@ async function addLayerDialog() {
     <div class="modal-layers-content">
       <div class="box">
         <div class="field">
-          <label class="label">Select the type of layer</label>
+          <label class="label">Select the layer type</label>
           <div class="control">
             <div class="select">
               <select id="selectType">
-                <option value="">Select the type of layer</option>
+                <option value="">Select the layer type</option>
                 <option value="ion">Cesium Ion</option>
                 <option value="gltf">GLTF</option>
                 <option value="wms">WMS</option>
@@ -962,7 +961,7 @@ async function addLayerDialog() {
           </div>
         </div>
 
-        <!-- Campos específicos para cada tipo de capa -->
+        <!-- Specific fields for each layer type -->
         <!-- Local 3D Tiles -->
         <div class="field" id="3dtilesField" style="display: none;">
           <label class="label">Select a local 3D Tiles model</label>
@@ -975,30 +974,30 @@ async function addLayerDialog() {
           </div>
         </div>
 
-        <!-- URL WMS -->
+        <!-- WMS URL -->
         <div class="field" id="wmsUrlField" style="display: none;">
-          <label class="label">Add URL for the WMS</label>
+          <label class="label">Add the WMS URL</label>
           <div class="control">
             <input class="input" type="text" id="wmsUrlInput" placeholder="https://example.com/wms" required>
           </div>
         </div>
 
-        <!-- Selección de capa WMS -->
+        <!-- WMS Layer Selection -->
         <div class="field" id="wmsLayerField" style="display: none;">
-          <label class="label">Seleccione una capa WMS</label>
+          <label class="label">Select a WMS layer</label>
           <div class="control">
             <div class="select">
               <select id="wmsLayerSelect">
-                <option value="">Loading layers WMS...</option>
+                <option value="">Loading WMS layers...</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- Opción para elegir si es una capa base (background) -->
+        <!-- Option to choose if it is a base layer -->
         <div class="field" id="wmsBaseLayerField" style="display: none;">
           <label class="checkbox">
-            <input type="checkbox" id="wmsIsBaseLayer"> Es una capa base (background)
+            <input type="checkbox" id="wmsIsBaseLayer"> Is this a base layer?
           </label>
         </div>
 
@@ -1008,7 +1007,7 @@ async function addLayerDialog() {
           <div class="control">
             <div class="select">
               <select id="czmlSelect">
-                <option value="">Cargando archivos CZML...</option>
+                <option value="">Loading CZML files...</option>
               </select>
             </div>
           </div>
@@ -1016,11 +1015,11 @@ async function addLayerDialog() {
 
         <!-- Cesium Ion Assets -->
         <div class="field" id="ionAssetsField" style="display: none;">
-          <label class="label">Seleccione un 3D-Tiles de Cesium Ion</label>
+          <label class="label">Select a Cesium Ion 3D Tiles asset</label>
           <div class="control">
             <div class="select">
               <select id="ionAssetsSelect">
-                <option value="">Loading data from Ion...</option>
+                <option value="">Loading Ion data...</option>
               </select>
             </div>
           </div>
@@ -1032,7 +1031,7 @@ async function addLayerDialog() {
           <div class="control">
             <div class="select">
               <select id="gltfSelect">
-                <option value="">Loading GLTF...</option>
+                <option value="">Loading GLTF files...</option>
               </select>
             </div>
           </div>
@@ -1058,7 +1057,7 @@ async function addLayerDialog() {
           </div>
         </div>
 
-        <!-- Botones de Acción -->
+        <!-- Action Buttons -->
         <div class="field is-grouped">
           <div class="control">
             <button class="button is-primary" id="submitButton">Add layer</button>
@@ -1073,6 +1072,8 @@ async function addLayerDialog() {
   `;
 
   document.body.appendChild(dialog);
+
+
 
   // Función para cerrar el modal
   function closeModal() {
@@ -1176,7 +1177,7 @@ async function addLayerDialog() {
         await load3dTilesFiles(data.folders[0]);
       }
     } catch (error) {
-      console.error('Error cargando carpetas de 3D Tiles:', error);
+      console.error('Error loading 3D Tiles folders:', error);
     }
   }
 
@@ -1188,18 +1189,19 @@ async function addLayerDialog() {
     try {
       const response = await fetch(`/3d/api/3dtiles-files?folder=${encodeURIComponent(selectedFolder)}`);
       if (!response.ok) {
-        throw new Error('No se encontró el tileset.json en esa carpeta.');
+        throw new Error('The tileset.json file was not found in the selected folder.');
       }
       const data = await response.json();
-
-      // Aquí guardas la URL del tileset en selectedTilesetUrl
+  
+      // Save the tileset URL in selectedTilesetUrl
       selectedTilesetUrl = data.tileset;
       console.log("Tileset URL loaded:", selectedTilesetUrl);
     } catch (error) {
-      console.error('Error cargando archivos 3D Tiles:', error);
-      selectedTilesetUrl = null; // Asegura que no haya un valor inválido
+      console.error('Error loading 3D Tiles files:', error);
+      selectedTilesetUrl = null; // Ensure no invalid value is used
     }
   }
+  
 
 
   //let selectedTilesetUrl = null;
@@ -1219,7 +1221,7 @@ async function addLayerDialog() {
       selectedTilesetUrl = data.tileset; // e.g. "/Tiles/micarpeta/tileset.json"
       console.log('Tileset URL loaded:', selectedTilesetUrl);
     } catch (error) {
-      console.error('Error al obtener el tileset.json:', error);
+      console.error('Error retrieving tileset.json:', error);
       selectedTilesetUrl = null;
     }
   });
@@ -1235,7 +1237,7 @@ async function addLayerDialog() {
       wmsLayerSelect.innerHTML = data.map(layer => `<option value="${layer.name}">${layer.name}</option>`).join('');
       wmsLayerField.style.display = 'block'; // Mostrar la selección de capas WMS
     } catch (error) {
-      console.error('Error cargando capas WMS:', error);
+      console.error('Error loading WMS layers:', error);
     }
   }
 
@@ -1257,7 +1259,7 @@ async function addLayerDialog() {
       const data = await response.json();
       czmlSelect.innerHTML = data.files3D.map(file => `<option value="${file.name}">${file.name}</option>`).join('');
     } catch (error) {
-      console.error('Error cargando archivos CZML:', error);
+      console.error('Error loading CZML files:', error);
     }
   }
 
@@ -1268,7 +1270,7 @@ async function addLayerDialog() {
       const data = await response.json();
       gltfSelect.innerHTML = data.files3D.map(file => `<option value="${file.name}">${file.name}</option>`).join('');
     } catch (error) {
-      console.error('Error cargando archivos GLTF:', error);
+      console.error('Error loading GLTF files:', error);
     }
   }
   // Función para cargar terrenos locales (carpetas) SIN buscar terrain.json
@@ -1277,7 +1279,7 @@ async function addLayerDialog() {
       // Ajusta la ruta al endpoint que listará TODAS las subcarpetas
       const response = await fetch('/3d/api/terrain-files');
       if (!response.ok) {
-        throw new Error('Error al obtener la lista de terrenos locales.');
+        throw new Error('Error retrieving the list of local terrains.');
       }
       const terrains = await response.json();
 
@@ -1287,12 +1289,12 @@ async function addLayerDialog() {
           .map(terrain => `<option value="${terrain.url}">${terrain.name}</option>`)
           .join('');
       } else {
-        terrainDropdown.innerHTML = `<option value="">No hay terrenos disponibles para agregar</option>`;
+        terrainDropdown.innerHTML = `<option value="">No land available to add</option>`;
       }
     } catch (error) {
       console.error('Error loading terrain options:', error);
       const terrainDropdown = document.getElementById('localTerrainDropdown');
-      terrainDropdown.innerHTML = `<option value="">Error al cargar terrenos</option>`;
+      terrainDropdown.innerHTML = `<option value="">Error when loading terrain</option>`;
     }
   }
 
@@ -1306,15 +1308,15 @@ async function addLayerDialog() {
       // Verifica si hay un token disponible
       if (data.token) {
         Cesium.Ion.defaultAccessToken = data.token;
-        console.log('Cesium Ion token configurado automáticamente.');
+        console.log('Cesium Ion token automatically configured.');
 
         // Cargar los activos de Ion
         await loadIonAssets(data.token);
       } else {
-        console.error('No se encontró un token de Cesium Ion en la configuración.');
+        console.error('No Cesium Ion token found in the configuration.');
       }
     } catch (error) {
-      console.error('Error al cargar el token de Cesium Ion:', error);
+      console.error('Error whean loading Cesium Ion Token:', error);
     }
   }
 
@@ -1345,7 +1347,7 @@ async function addLayerDialog() {
         ionAssetsSelect.innerHTML = `<option value="">No assets found</option>`;
       }
     } catch (error) {
-      console.error('Error cargando los activos de Cesium Ion:', error);
+      console.error('Error loading Cesium Ion files:', error);
     }
   }
 
@@ -1374,106 +1376,106 @@ async function addLayerDialog() {
     const selectedUrl = localTerrainDropdown?.value;
 
     try {
-      let layerConfig;
+        let layerConfig;
 
-      switch (type) {
-        case "ion":
-          if (!ionAssetId || !name || !assetType) {
-            alert("Por favor, complete todos los campos para Cesium Ion.");
-            return;
-          }
+        switch (type) {
+            case "ion":
+                if (!ionAssetId || !name || !assetType) {
+                    alert("Please fill in all fields for Cesium Ion.");
+                    return;
+                }
 
-          // Procesar Ion según el tipo de recurso (terrain o 3dtiles)
-          if (assetType === "terrain") {
-            layerConfig = {
-              name,
-              type: "ion",
-              id: ionAssetId,
-              url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
-            };
-            await saveTerrainLayer(layerConfig); // Guardar como terreno Ion
-          } else if (assetType === "3dtile") { // Asegúrate de que 'data-type' en el backend sea '3dtile' o '3dtiles' consistente
-            layerConfig = {
-              name,
-              type: "3dtiles",
-              id: ionAssetId,
-              url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
-            };
-            await saveLayer(layerConfig); // Guardar como capa de 3D Tiles Ion
-          }
-          break;
+                // Process Ion based on the resource type (terrain or 3D tiles)
+                if (assetType === "terrain") {
+                    layerConfig = {
+                        name,
+                        type: "ion",
+                        id: ionAssetId,
+                        url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
+                    };
+                    await saveTerrainLayer(layerConfig); // Save as Ion terrain
+                } else if (assetType === "3dtile") {
+                    layerConfig = {
+                        name,
+                        type: "3dtiles",
+                        id: ionAssetId,
+                        url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
+                    };
+                    await saveLayer(layerConfig); // Save as 3D Tiles Ion layer
+                }
+                break;
 
-        case "localTerrain":
-          if (!selectedUrl || !name) {
-            alert("Por favor, seleccione un terreno local y complete el nombre.");
-            return;
-          }
-          // type = "local" o "terrain" (como prefieras que tu backend distinga)
-          layerConfig = {
-            name,
-            type: "local",  // <--- Indica que es un terreno local
-            url: selectedUrl // <--- Ruta que recibiste del dropdown
-          };
-          await saveTerrainLayer(layerConfig);
-          break;
+            case "localTerrain":
+                if (!selectedUrl || !name) {
+                    alert("Please select a local terrain and provide a name.");
+                    return;
+                }
+                layerConfig = {
+                    name,
+                    type: "local",  // Indicates a local terrain
+                    url: selectedUrl // Path received from the dropdown
+                };
+                await saveTerrainLayer(layerConfig);
+                break;
 
-        case "3dtiles":
-          if (!selectedTilesetUrl) {
-            alert("Por favor, seleccione un archivo 3D Tiles local (y carpeta).");
-            return;
-          }
-          if (!name) {
-            alert("Por favor, asigna un nombre para la capa.");
-            return;
-          }
-          layerConfig = {
-            name,
-            type: "3dtiles",
-            url: selectedTilesetUrl,
-            visible: false
-          };
-          await saveLayer(layerConfig);
-          break;
+            case "3dtiles":
+                if (!selectedTilesetUrl) {
+                    alert("Please select a local 3D Tiles file (and folder).");
+                    return;
+                }
+                if (!name) {
+                    alert("Please provide a name for the layer.");
+                    return;
+                }
+                layerConfig = {
+                    name,
+                    type: "3dtiles",
+                    url: selectedTilesetUrl,
+                    visible: false
+                };
+                await saveLayer(layerConfig);
+                break;
 
-        case "gltf":
-          if (!gltfName || !name) {
-            alert("Por favor, seleccione un archivo GLTF y complete el nombre.");
-            return;
-          }
-          layerConfig = { name, type: "gltf", visible: false, gltfName };
-          await saveLayer(layerConfig);
-          break;
+            case "gltf":
+                if (!gltfName || !name) {
+                    alert("Please select a GLTF file and provide a name.");
+                    return;
+                }
+                layerConfig = { name, type: "gltf", visible: false, gltfName };
+                await saveLayer(layerConfig);
+                break;
 
-        case "czml":
-          if (!czmlFile || !name) {
-            alert("Por favor, seleccione un archivo CZML y complete el nombre.");
-            return;
-          }
-          layerConfig = { name, type: "czml", visible: false, czmlName: czmlFile };
-          await saveLayer(layerConfig);
-          break;
+            case "czml":
+                if (!czmlFile || !name) {
+                    alert("Please select a CZML file and provide a name.");
+                    return;
+                }
+                layerConfig = { name, type: "czml", visible: false, czmlName: czmlFile };
+                await saveLayer(layerConfig);
+                break;
 
-        case "wms":
-          if (!wmsUrl || !wmsLayer || !name) {
-            alert("Por favor, complete todos los campos para la capa WMS.");
-            return;
-          }
-          layerConfig = { name, type: "wms", url: wmsUrl, layerName: wmsLayer, isBaseLayer };
-          await saveLayer(layerConfig);
-          break;
+            case "wms":
+                if (!wmsUrl || !wmsLayer || !name) {
+                    alert("Please fill in all fields for the WMS layer.");
+                    return;
+                }
+                layerConfig = { name, type: "wms", url: wmsUrl, layerName: wmsLayer, isBaseLayer };
+                await saveLayer(layerConfig);
+                break;
 
-        default:
-          alert("Tipo de capa no válido. Por favor, seleccione un tipo.");
-          return;
-      }
+            default:
+                alert("Invalid layer type. Please select a valid type.");
+                return;
+        }
 
-      // Cerrar el modal después de guardar la capa
-      closeModal();
+        // Close the modal after saving the layer
+        closeModal();
     } catch (error) {
-      console.error("Error al guardar la capa:", error);
-      alert("Ocurrió un error al guardar la capa. Por favor, inténtelo de nuevo.");
+        console.error("Error saving the layer:", error);
+        alert("An error occurred while saving the layer. Please try again.");
     }
-  };
+};
+
 
   // Función para guardar un terreno (Ion o Local)
   async function saveTerrainLayer(layerConfig) {
@@ -1494,7 +1496,7 @@ async function addLayerDialog() {
 
       const data = await response.json();
       console.log('Terrain layer added successfully:', data);
-      alert(`Terreno "${layerConfig.name}" agregado exitosamente.`);
+      alert(`Terrain "${layerConfig.name}" successfully added.`);
       loadLayers(); // Recargar todas las capas y terrenos
     } catch (error) {
       console.error('Error adding terrain layer:', error);
@@ -1521,7 +1523,7 @@ async function addLayerDialog() {
 
       const data = await response.json();
       console.log('Layer added successfully:', data);
-      alert(`Capa "${layerConfig.name}" agregada exitosamente.`);
+      alert(`Layer "${layerConfig.name}" successfully added.`);
       loadLayers(); // Recargar todas las capas y terrenos
     } catch (error) {
       console.error('Error adding layer:', error);
@@ -1548,22 +1550,23 @@ function saveLayersToFile(newLayers) {
 
 async function loadTerrainOptions() {
   try {
-    const response = await fetch('/3d/api/terrain-files'); // Ruta corregida
+    const response = await fetch('/3d/api/terrain-files'); // Corrected path
     if (!response.ok) {
-      throw new Error('Error al obtener la lista de terrenos locales.');
+      throw new Error('Error fetching the list of local terrains.');
     }
     const terrains = await response.json();
 
     const terrainDropdown = document.getElementById('localTerrainDropdown');
     terrainDropdown.innerHTML = terrains.length > 0
       ? terrains.map(terrain => `<option value="${terrain.url}">${terrain.name}</option>`).join('')
-      : `<option value="">No hay terrenos disponibles para agregar</option>`;
+      : `<option value="">No terrains available to add</option>`;
   } catch (error) {
     console.error('Error loading terrain options:', error);
     const terrainDropdown = document.getElementById('localTerrainDropdown');
-    terrainDropdown.innerHTML = `<option value="">Error al cargar terrenos</option>`;
+    terrainDropdown.innerHTML = `<option value="">Error loading terrains</option>`;
   }
 }
+
 
 async function loadTerrains() {
   try {
@@ -1655,13 +1658,13 @@ async function saveSelectedTerrain(url) {
 
     const result = await response.json();
     if (result.message) {
-      console.log('Terreno seleccionado guardado exitosamente.');
+      console.log('Selected terrain saved successfully.');
     } else {
-      console.error('Error al guardar el terreno seleccionado:', result.error);
+      console.error('Error saving the selected terrain:', result.error);
     }
   } catch (error) {
-    console.error('Error al guardar el terreno seleccionado:', error.message || error);
-    alert('Error al guardar el terreno seleccionado: ' + error.message);
+    console.error('Error saving the selected terrain:', error.message || error);
+    alert('Error saving the selected terrain: ' + error.message);
   }
 }
 

@@ -66,7 +66,7 @@
   const pinBuilder = new Cesium.PinBuilder();
   const url_camara = Cesium.buildModuleUrl('https://int.rabbalshedekraft.se/CesiumIkons/Textures/maki/camera.png');
 
-  pinBuilder.fromUrl(url_camara, Cesium.Color.GREEN, 48)
+  pinBuilder.fromUrl(url_camara, Cesium.Color.GREEN, 200)
     .then(function (canvas) {
       return cesiumViewer.entities.add({
         id: 'Rabbalshede-Kraft',
@@ -75,7 +75,7 @@
           <p><abbr title="Rabalshede Kraft">Adress:</abbr> Marknadsvägen 1 45755 RABBALSHEDE</p>
           <p>Descripción: Bilden skapdes av Jörgen Karlsson med en Mavic pro drönare.</p>
         `,
-        position: Cesium.Cartesian3.fromDegrees(11.458393, 58.617779, 150),
+        position: Cesium.Cartesian3.fromDegrees(11.458393, 58.617779, 1000),
         billboard: {
           image: canvas.toDataURL(),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM

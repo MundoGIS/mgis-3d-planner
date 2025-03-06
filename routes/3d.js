@@ -306,6 +306,16 @@ router.get('/api/gltf-files', (req, res) => {
   });
 });
 
+router.get('/api/glb-files', (req, res) => {
+  fs.readdir(gltfDir, (err, files) => {
+    if (err) {
+      return res.status(500).send('Unable to scan directory: ' + err);
+    }
+    const glbFiles = files.filter(file => file.endsWith('.glb'));
+    res.json({ files3D: glbFiles.map(file => ({ name: file })) });
+  });
+});
+
 
 // Middleware para deshabilitar el caché
 function disableCache(req, res, next) {

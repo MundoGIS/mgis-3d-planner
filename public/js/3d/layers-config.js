@@ -539,6 +539,9 @@ function loadLayer(layer) {
     case 'gltf':
       loadGltfLayer(layer);
       break;
+    case 'glb':
+      loadGlbLayer(layer);
+      break;
     case 'kml':
       loadKmlLayer(layer);
       break;
@@ -691,6 +694,71 @@ function loadCzmlLayer(layer) {
       console.error("Error loading CZML file:", error);
     });
 }
+
+async function loadGlbLayer(layer) {
+  console.log("Loading GLB layer:", layer.name);
+
+  // 1) Construir rutas 
+  const geoJsonPath = `/geojson-conf/${layer.glbName.replace('.glb', '.geojson')}`;
+  const glbPath = `/3d/${layer.glbName}`;
+
+  try {
+    // 2) Leer el GeoJSON de ubicación/rotación
+    const response = await fetch(geoJsonPath);
+    if (!response.ok) {
+      throw new Error('GeoJSON file not found for this GLB model');
+    }
+    const data = await response.json();
+
+    const [longitude, latitude, height] = data.features[0].geometry.coordinates;
+    const props = data.features[0].properties;
+
+    // 3) Calcular la matriz de posición y rotación
+    const modelPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
+    let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(modelPosition);
+
+    const hRot = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(props.horizontalRotation || 0));
+    const vRot = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(props.verticalRotation || 0));
+    const lRot = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(props.lateralRotation || 0));
+
+    // Combinar rotaciones
+    let rotationMatrix = Cesium.Matrix3.multiply(hRot, lRot, new Cesium.Matrix3());
+    rotationMatrix = Cesium.Matrix3.multiply(rotationMatrix, vRot, rotationMatrix);
+    Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationMatrix, modelMatrix);
+
+    // 4) Cargar el modelo (GLB se carga igual que GLTF)
+    const loadedModel = await Cesium.Model.fromGltfAsync({
+      url: glbPath,
+      modelMatrix: modelMatrix,
+      scale: 1.0,
+      minimumPixelSize: 0.0,
+      clampToGround: true
+    });
+
+    // 5) Visibilidad inicial
+    const initialShow = (typeof layer.visible === 'boolean') ? layer.visible : false;
+    loadedModel.show = initialShow;
+
+    // 6) Añadir a escena
+    cesiumViewer.scene.primitives.add(loadedModel);
+
+    // 7) Registrar en loadedLayers
+    loadedLayers[layer.name] = {
+      cesiumObject: loadedModel,
+      type: layer.type,    // 'glb'
+      show: initialShow,
+    };
+
+    // 8) Ajustar texturas (si quieres la misma lógica)
+    await loadedModel.readyPromise;
+    adjustModelTextures(loadedModel);
+
+    console.log(`GLB layer loaded and textures adjusted: ${layer.name}`);
+  } catch (error) {
+    console.error('Error loading GLB file:', error);
+  }
+}
+
 
 async function loadGltfLayer(layer) {
   console.log("Loading GLTF layer:", layer.name);
@@ -951,6 +1019,7 @@ async function addLayerDialog() {
                 <option value="">Select the layer type</option>
                 <option value="ion">Cesium Ion</option>
                 <option value="gltf">GLTF</option>
+                <option value="glb">GLB</option>
                 <option value="wms">WMS</option>
                 <option value="kml">KML</option>
                 <option value="czml">CZML</option>
@@ -1037,6 +1106,18 @@ async function addLayerDialog() {
           </div>
         </div>
 
+         <!-- GLB -->
+        <div class="field" id="glbField" style="display: none;">
+          <label class="label">Select a GLB model</label>
+          <div class="control">
+            <div class="select">
+              <select id="glbSelect">
+                <option value="">Loading GLB files...</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <!-- Local Terrain Dropdown -->
         <div class="field" id="localTerrainField" style="display: none;">
           <label class="label">Select a local terrain</label>
@@ -1084,6 +1165,7 @@ async function addLayerDialog() {
   const selectType = document.getElementById('selectType');
   const ionAssetsField = document.getElementById('ionAssetsField');
   const gltfField = document.getElementById('gltfField');
+  const glbField = document.getElementById('glbField');
   const czmlField = document.getElementById('czmlField');
   const wmsUrlField = document.getElementById('wmsUrlField');
   const wmsLayerField = document.getElementById('wmsLayerField');
@@ -1109,6 +1191,7 @@ async function addLayerDialog() {
       'czmlField',
       'ionAssetsField',
       'gltfField',
+      'glbField',
       'localTerrainField'
     ];
     fieldsToHide.forEach(id => {
@@ -1147,7 +1230,10 @@ async function addLayerDialog() {
         gltfField.style.display = 'block';
         await loadGltfFiles();
         break;
-
+      case 'glb':
+        glbField.style.display = 'block';
+        await loadGlbfFiles();
+        break;
       case 'localTerrain':
         localTerrainField.style.display = 'block';
         await loadTerrainOptions(); // Cargar terrenos locales
@@ -1192,7 +1278,7 @@ async function addLayerDialog() {
         throw new Error('The tileset.json file was not found in the selected folder.');
       }
       const data = await response.json();
-  
+
       // Save the tileset URL in selectedTilesetUrl
       selectedTilesetUrl = data.tileset;
       console.log("Tileset URL loaded:", selectedTilesetUrl);
@@ -1201,7 +1287,7 @@ async function addLayerDialog() {
       selectedTilesetUrl = null; // Ensure no invalid value is used
     }
   }
-  
+
 
 
   //let selectedTilesetUrl = null;
@@ -1271,6 +1357,20 @@ async function addLayerDialog() {
       gltfSelect.innerHTML = data.files3D.map(file => `<option value="${file.name}">${file.name}</option>`).join('');
     } catch (error) {
       console.error('Error loading GLTF files:', error);
+    }
+  }
+   // Función para cargar archivos GLTF y llenar el dropdown
+   async function loadGlbfFiles() {
+    try {
+      const response = await fetch('/3d/api/glb-files');
+      const data = await response.json();
+      // Usar el select de GLB (id="glbSelect") y no gltfSelect
+      const glbSelect = document.getElementById("glbSelect");
+      glbSelect.innerHTML = data.files3D
+        .map(file => `<option value="${file.name}">${file.name}</option>`)
+        .join('');
+    } catch (error) {
+      console.error('Error loading GLB files:', error);
     }
   }
   // Función para cargar terrenos locales (carpetas) SIN buscar terrain.json
@@ -1369,6 +1469,7 @@ async function addLayerDialog() {
     const assetType = ionAssetsSelect?.selectedOptions[0]?.getAttribute("data-type");
     const tilesetName = tilesSelect?.value;
     const gltfName = gltfSelect?.value;
+    const glbName = document.getElementById("glbSelect")?.value;  // <-- Agregado para GLB
     const czmlFile = czmlSelect?.value;
     const wmsUrl = wmsUrlInput?.value.trim();
     const wmsLayer = wmsLayerSelect?.value;
@@ -1376,155 +1477,200 @@ async function addLayerDialog() {
     const selectedUrl = localTerrainDropdown?.value;
 
     try {
-        let layerConfig;
+      let layerConfig;
 
-        switch (type) {
-            case "ion":
-                if (!ionAssetId || !name || !assetType) {
-                    alert("Please fill in all fields for Cesium Ion.");
-                    return;
-                }
+      switch (type) {
+        // ------------------------------------------------------
+        // A) CESIUM ION
+        // ------------------------------------------------------
+        case "ion":
+          if (!ionAssetId || !assetType) {
+            alert("Please choose a valid Ion asset and name.");
+            return;
+          }
+          if (assetType === "terrain") {
+            // Terreno Ion
+            layerConfig = {
+              name,
+              type: "ion",  // o "terrainIon", según tu convención
+              id: ionAssetId,
+              url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
+            };
+            await saveTerrainLayer(layerConfig);
+          } else if (assetType === "3dtiles") {
+            // 3D Tiles Ion
+            layerConfig = {
+              name,
+              type: "3dtiles",
+              id: ionAssetId,
+              url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
+            };
+            await saveLayer(layerConfig);
+          }
+          break;
 
-                // Process Ion based on the resource type (terrain or 3D tiles)
-                if (assetType === "terrain") {
-                    layerConfig = {
-                        name,
-                        type: "ion",
-                        id: ionAssetId,
-                        url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
-                    };
-                    await saveTerrainLayer(layerConfig); // Save as Ion terrain
-                } else if (assetType === "3dtile") {
-                    layerConfig = {
-                        name,
-                        type: "3dtiles",
-                        id: ionAssetId,
-                        url: `https://assets.cesium.com/${ionAssetId}/tileset.json`
-                    };
-                    await saveLayer(layerConfig); // Save as 3D Tiles Ion layer
-                }
-                break;
+        // ------------------------------------------------------
+        // B) LOCAL TERRAIN
+        // ------------------------------------------------------
+        case "localTerrain":
+          if (!selectedUrl) {
+            alert("Please select a local terrain folder and name.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "local",  // Indica un terreno local
+            url: selectedUrl
+          };
+          await saveTerrainLayer(layerConfig);
+          break;
 
-            case "localTerrain":
-                if (!selectedUrl || !name) {
-                    alert("Please select a local terrain and provide a name.");
-                    return;
-                }
-                layerConfig = {
-                    name,
-                    type: "local",  // Indicates a local terrain
-                    url: selectedUrl // Path received from the dropdown
-                };
-                await saveTerrainLayer(layerConfig);
-                break;
+        // ------------------------------------------------------
+        // C) LOCAL 3D TILES
+        // ------------------------------------------------------
+        case "3dtiles":
+          if (!selectedTilesetUrl) {
+            alert("Please select a local 3D Tiles folder (tileset.json).");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "3dtiles",
+            url: selectedTilesetUrl,
+            visible: false
+          };
+          await saveLayer(layerConfig);
+          break;
 
-            case "3dtiles":
-                if (!selectedTilesetUrl) {
-                    alert("Please select a local 3D Tiles file (and folder).");
-                    return;
-                }
-                if (!name) {
-                    alert("Please provide a name for the layer.");
-                    return;
-                }
-                layerConfig = {
-                    name,
-                    type: "3dtiles",
-                    url: selectedTilesetUrl,
-                    visible: false
-                };
-                await saveLayer(layerConfig);
-                break;
+        // ------------------------------------------------------
+        // D) GLTF
+        // ------------------------------------------------------
+        case "gltf":
+          if (!gltfName) {
+            alert("Please select a GLTF file and name.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "gltf",
+            visible: false,
+            gltfName
+          };
+          await saveLayer(layerConfig);
+          break;
 
-            case "gltf":
-                if (!gltfName || !name) {
-                    alert("Please select a GLTF file and provide a name.");
-                    return;
-                }
-                layerConfig = { name, type: "gltf", visible: false, gltfName };
-                await saveLayer(layerConfig);
-                break;
+           // ------------------------------------------------------
+        // D) GLB
+        // ------------------------------------------------------
+        case "glb":
+          if (!glbName) {
+            alert("Please select a GLB file and name.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "glb",
+            visible: false,
+            glbName
+          };
+          await saveLayer(layerConfig);
+          break;
 
-            case "czml":
-                if (!czmlFile || !name) {
-                    alert("Please select a CZML file and provide a name.");
-                    return;
-                }
-                layerConfig = { name, type: "czml", visible: false, czmlName: czmlFile };
-                await saveLayer(layerConfig);
-                break;
+        // ------------------------------------------------------
+        // E) CZML
+        // ------------------------------------------------------
+        case "czml":
+          if (!czmlFile) {
+            alert("Please select a CZML file and name.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "czml",
+            visible: false,
+            czmlName: czmlFile
+          };
+          await saveLayer(layerConfig);
+          break;
 
-            case "wms":
-                if (!wmsUrl || !wmsLayer || !name) {
-                    alert("Please fill in all fields for the WMS layer.");
-                    return;
-                }
-                layerConfig = { name, type: "wms", url: wmsUrl, layerName: wmsLayer, isBaseLayer };
-                await saveLayer(layerConfig);
-                break;
+        // ------------------------------------------------------
+        // F) WMS
+        // ------------------------------------------------------
+        case "wms":
+          if (!wmsUrl || !wmsLayer) {
+            alert("Please fill WMS URL and layer name.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "wms",
+            url: wmsUrl,
+            layerName: wmsLayer,
+            isBaseLayer
+          };
+          await saveLayer(layerConfig);
+          break;
 
-            default:
-                alert("Invalid layer type. Please select a valid type.");
-                return;
-        }
+        // ------------------------------------------------------
+        // G) KML (o algo que tengas pendiente)
+        // ------------------------------------------------------
+        case "kml":
+          // Aquí falta la lógica para KML (si la necesitas).
+          alert("KML saving is not implemented yet.");
+          break;
 
-        // Close the modal after saving the layer
-        closeModal();
+        default:
+          alert("Invalid layer type. Please select a valid type.");
+          return;
+      }
+      // Close the modal after saving the layer
+      closeModal();
     } catch (error) {
-        console.error("Error saving the layer:", error);
-        alert("An error occurred while saving the layer. Please try again.");
+      console.error("Error saving the layer:", error);
+      alert("An error occurred while saving the layer. Please try again.");
     }
-};
+  };
 
 
   // Función para guardar un terreno (Ion o Local)
   async function saveTerrainLayer(layerConfig) {
     try {
-      console.log("Saving terrain layer:", layerConfig); // Añadir log
-
-      // Guardar el terreno en el backend
-      const response = await fetch('/3d/api/save-terrain', { // Ruta correcta
+      console.log("Saving terrain layer:", layerConfig);
+      const response = await fetch('/3d/api/save-terrain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(layerConfig),
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Failed to save terrain layer');
       }
-
       const data = await response.json();
       console.log('Terrain layer added successfully:', data);
       alert(`Terrain "${layerConfig.name}" successfully added.`);
-      loadLayers(); // Recargar todas las capas y terrenos
+      loadLayers(); // Recargar capas en tu interfaz
     } catch (error) {
       console.error('Error adding terrain layer:', error);
       alert('Error adding terrain layer: ' + error.message);
     }
   }
 
-  // Función para guardar una capa genérica
   async function saveLayer(layerConfig) {
     try {
-      console.log("Saving layer:", layerConfig); // Añadir log
-
-      // Aquí deberías implementar una ruta similar a 'save-terrain' para guardar otras capas
+      console.log("Saving layer:", layerConfig);
       const response = await fetch('/3d/api/save-layer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(layerConfig), // un objeto con la info de la capa
+        body: JSON.stringify(layerConfig),
       });
-
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Failed to save layer');
       }
-
       const data = await response.json();
       console.log('Layer added successfully:', data);
       alert(`Layer "${layerConfig.name}" successfully added.`);
-      loadLayers(); // Recargar todas las capas y terrenos
+      loadLayers(); // Recargar capas en tu interfaz
     } catch (error) {
       console.error('Error adding layer:', error);
       alert('Error adding layer: ' + error.message);
@@ -1635,12 +1781,6 @@ async function selectTerrain(urlOrType) {
   }
 }
 
-
-
-
-
-
-
 async function saveSelectedTerrain(url) {
   try {
     const response = await fetch('/3d/api/update-terrain-visibility', {
@@ -1667,8 +1807,6 @@ async function saveSelectedTerrain(url) {
     alert('Error saving the selected terrain: ' + error.message);
   }
 }
-
-
 
 async function saveIonToken(token) {
   await fetch('/3d/api/save-ion-token', {
