@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.643833338862084,
+          60.12881531965449,
+          -0.0022312125999000934
+        ]
+      },
+      "properties": {
+        "name": "Tree_11_5m",
+        "scale": 1,
+        "minimumPixelSize": 128,
+        "horizontalRotation": 0,
+        "verticalRotation": 0,
+        "lateralRotation": 0
+      }
+    }
+  ]
+}

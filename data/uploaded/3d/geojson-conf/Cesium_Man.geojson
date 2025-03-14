@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.98954784851545,
+          59.321013484903254,
+          61.67301598216491
+        ]
+      },
+      "properties": {
+        "name": "Cesium_Man",
+        "scale": 1,
+        "minimumPixelSize": 128,
+        "horizontalRotation": 0,
+        "verticalRotation": 0,
+        "lateralRotation": 0
+      }
+    }
+  ]
+}

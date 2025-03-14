@@ -803,14 +803,14 @@ terrainSelect.addEventListener('change', async function () {
       viewerElement.innerHTML = ''; // Limpiar el contenido anterior
 
       cesiumViewer = new Cesium.Viewer('cesiumContainer', {
-        timeline: false,
+        timeline: true,
         geocoder: true,
         vrButton: false,
         baseLayerPicker: true,
         navigationHelpButton: false,
         shadows: false,
         shouldAnimate: true,
-        animation: false,
+        animation: true,
         sceneModePicker: false,
         fullscreenButton: false,
         sceneMode: Cesium.SceneMode.SCENE3D,

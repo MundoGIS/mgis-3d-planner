@@ -25,7 +25,14 @@
         "id": "96188",
         "url": "https://assets.cesium.com/96188/tileset.json",
         "key": 1739371602225,
-        "visible": false
+        "visible": true
+      },
+      {
+        "name": "mannen",
+        "type": "glb",
+        "visible": false,
+        "glbName": "Cesium_Man.glb",
+        "key": 1741620056505
       }
     ],
     "terrains": [
@@ -34,6 +41,13 @@
         "name": "Word terrain",
         "url": "https://assets.cesium.com/1/tileset.json",
         "type": "ion",
+        "visible": true
+      },
+      {
+        "key": "1741957106237",
+        "name": "Nacka Sweden",
+        "url": "/terrain/demo_terrain/",
+        "type": "local",
         "visible": false
       }
     ]

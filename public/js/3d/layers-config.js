@@ -698,12 +698,10 @@ function loadCzmlLayer(layer) {
 async function loadGlbLayer(layer) {
   console.log("Loading GLB layer:", layer.name);
 
-  // 1) Construir rutas 
   const geoJsonPath = `/geojson-conf/${layer.glbName.replace('.glb', '.geojson')}`;
   const glbPath = `/3d/${layer.glbName}`;
 
   try {
-    // 2) Leer el GeoJSON de ubicación/rotación
     const response = await fetch(geoJsonPath);
     if (!response.ok) {
       throw new Error('GeoJSON file not found for this GLB model');
@@ -713,7 +711,6 @@ async function loadGlbLayer(layer) {
     const [longitude, latitude, height] = data.features[0].geometry.coordinates;
     const props = data.features[0].properties;
 
-    // 3) Calcular la matriz de posición y rotación
     const modelPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
     let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(modelPosition);
 
@@ -721,12 +718,10 @@ async function loadGlbLayer(layer) {
     const vRot = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(props.verticalRotation || 0));
     const lRot = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(props.lateralRotation || 0));
 
-    // Combinar rotaciones
     let rotationMatrix = Cesium.Matrix3.multiply(hRot, lRot, new Cesium.Matrix3());
     rotationMatrix = Cesium.Matrix3.multiply(rotationMatrix, vRot, rotationMatrix);
     Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationMatrix, modelMatrix);
 
-    // 4) Cargar el modelo (GLB se carga igual que GLTF)
     const loadedModel = await Cesium.Model.fromGltfAsync({
       url: glbPath,
       modelMatrix: modelMatrix,
@@ -735,30 +730,39 @@ async function loadGlbLayer(layer) {
       clampToGround: true
     });
 
-    // 5) Visibilidad inicial
     const initialShow = (typeof layer.visible === 'boolean') ? layer.visible : false;
     loadedModel.show = initialShow;
 
-    // 6) Añadir a escena
     cesiumViewer.scene.primitives.add(loadedModel);
 
-    // 7) Registrar en loadedLayers
     loadedLayers[layer.name] = {
       cesiumObject: loadedModel,
-      type: layer.type,    // 'glb'
+      type: layer.type,
       show: initialShow,
     };
 
-    // 8) Ajustar texturas (si quieres la misma lógica)
     await loadedModel.readyPromise;
     adjustModelTextures(loadedModel);
 
-    console.log(`GLB layer loaded and textures adjusted: ${layer.name}`);
+    // Verifica que el modelo tenga animaciones definidas
+    if (loadedModel.gltf && loadedModel.gltf.animations && loadedModel.gltf.animations.length > 0) {
+      for (let i = 0; i < loadedModel.gltf.animations.length; i++) {
+        loadedModel.activeAnimations.add({
+          index: i, // Activa la animación con índice i
+          loop: Cesium.ModelAnimationLoop.REPEAT, // O usa Cesium.ModelAnimationLoop.NONE para no repetir
+          multiplier: 1.0 // Ajusta la velocidad de la animación
+        });
+      }
+    } else {
+      console.warn("El modelo no contiene animaciones.");
+    }
+
+
+    console.log(`GLB layer loaded, textures adjusted, and animations activated: ${layer.name}`);
   } catch (error) {
     console.error('Error loading GLB file:', error);
   }
 }
-
 
 async function loadGltfLayer(layer) {
   console.log("Loading GLTF layer:", layer.name);
@@ -779,53 +783,60 @@ async function loadGltfLayer(layer) {
     const latitude = coordinates[1];
     const height = coordinates[2];
 
-    // Crear la posición del modelo en Cesium
     const modelPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, height);
     let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(modelPosition);
 
-    // Aplicar rotaciones: horizontal (Z), vertical (X), lateral (Y)
     const hRotation = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(properties.horizontalRotation || 0));
     const vRotation = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(properties.verticalRotation || 0));
     const lRotation = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(properties.lateralRotation || 0));
 
-    // Combinar las tres rotaciones
     const rotationMatrix = Cesium.Matrix3.multiply(hRotation, lRotation, new Cesium.Matrix3());
     Cesium.Matrix3.multiply(rotationMatrix, vRotation, rotationMatrix);
 
-    // Aplicar la rotación combinada al modelMatrix final
     Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationMatrix, modelMatrix);
 
-    // Cargar el modelo GLTF con la matriz de transformación
     const loadedModel = await Cesium.Model.fromGltfAsync({
       url: gltfPath,
       modelMatrix: modelMatrix,
-      scale: 1.0, // Mantiene la escala original del modelo
-      minimumPixelSize: 0.0, // Evita el escalado automático basado en el tamaño en pantalla
-      clampToGround: true // Asegura que el modelo se ajuste al terreno
+      scale: 1.0,
+      minimumPixelSize: 0.0,
+      clampToGround: true
     });
 
-    // Asignar la visibilidad inicial
     const initialShow = (typeof layer.visible === 'boolean') ? layer.visible : false;
     loadedModel.show = initialShow;
 
-    // Agregar el modelo a la escena
     cesiumViewer.scene.primitives.add(loadedModel);
 
-    // Registrar en loadedLayers con 'cesiumObject'
     loadedLayers[layer.name] = {
       cesiumObject: loadedModel,
       type: layer.type,
       show: initialShow,
     };
 
-    // Ajustar texturas y filtros cuando el modelo esté listo
     await loadedModel.readyPromise;
     adjustModelTextures(loadedModel);
-    console.log(`GLTF layer loaded and textures adjusted: ${layer.name}`);
+
+    // Verifica que el modelo tenga animaciones definidas
+    if (loadedModel.gltf && loadedModel.gltf.animations && loadedModel.gltf.animations.length > 0) {
+      for (let i = 0; i < loadedModel.gltf.animations.length; i++) {
+        loadedModel.activeAnimations.add({
+          index: i, // Activa la animación con índice i
+          loop: Cesium.ModelAnimationLoop.REPEAT, // O usa Cesium.ModelAnimationLoop.NONE para no repetir
+          multiplier: 1.0 // Ajusta la velocidad de la animación
+        });
+      }
+    } else {
+      console.warn("El modelo no contiene animaciones.");
+    }
+
+
+    console.log(`GLTF layer loaded, textures adjusted, and animations activated: ${layer.name}`);
   } catch (error) {
     console.error('Error loading GLTF/GLB file:', error);
   }
 }
+
 
 
 
@@ -1359,8 +1370,8 @@ async function addLayerDialog() {
       console.error('Error loading GLTF files:', error);
     }
   }
-   // Función para cargar archivos GLTF y llenar el dropdown
-   async function loadGlbfFiles() {
+  // Función para cargar archivos GLTF y llenar el dropdown
+  async function loadGlbfFiles() {
     try {
       const response = await fetch('/3d/api/glb-files');
       const data = await response.json();
@@ -1559,7 +1570,7 @@ async function addLayerDialog() {
           await saveLayer(layerConfig);
           break;
 
-           // ------------------------------------------------------
+        // ------------------------------------------------------
         // D) GLB
         // ------------------------------------------------------
         case "glb":

@@ -29,21 +29,22 @@ fetch('/3d/api/load-cesium-token')
       animation: true,
       sceneModePicker: false,
       shouldAnimate: true,
-      contextOptions: { 
-        webgl: { 
-          antialias: true 
+      contextOptions: {
+        webgl: {
+          antialias: true
         }
       }
-    
+
     });
 
-    
 
     cesiumViewer.scene.globe.depthTestAgainstTerrain = true;
 
     // Ocultar timeline y animation al inicio
     cesiumViewer.timeline.container.style.display = 'none';
     cesiumViewer.animation.container.style.display = 'none';
+    cesiumViewer.clock.shouldAnimate = true;
+
 
     setupCesium();
   })
@@ -74,6 +75,58 @@ function setupCesium() {
     if (!scene.screenSpaceEventHandler) {
       scene.screenSpaceEventHandler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
     }
+
+
+    function enableDragDrop() {
+      if (cesiumViewer) {
+        cesiumViewer.extend(Cesium.viewerDragDropMixin, {
+          clearOnDrop: false,
+          clampToGround: true
+        });
+
+        cesiumViewer.dropError.addEventListener(function (viewerArg, source, error) {
+          window.alert('Error processing ' + source + ': ' + error);
+        });
+      }
+    }
+
+    // Suponiendo que ya tienes el visor configurado...
+    const dropArea = document.getElementById("cesiumContainer");
+    dropArea.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const file = event.dataTransfer.files[0];
+      if (!file) return;
+      const extension = file.name.split('.').pop().toLowerCase();
+      if (extension === "gltf" || extension === "glb") {
+        const url = URL.createObjectURL(file);
+        try {
+          const model = await Cesium.Model.fromGltfAsync({
+            url: url,
+            modelMatrix: Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.ZERO),
+            scale: 1.0
+          });
+          cesiumViewer.scene.primitives.add(model);
+          // Activa animaciones si el modelo las tiene:
+          if (model.gltf && model.gltf.animations && model.gltf.animations.length > 0) {
+            for (let i = 0; i < model.gltf.animations.length; i++) {
+              model.activeAnimations.add({
+                index: i,
+                loop: Cesium.ModelAnimationLoop.REPEAT,
+                multiplier: 1.0
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error loading glTF/GLB model:", error);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+    });
+    dropArea.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+
 
     const clouds = scene.primitives.add(new Cesium.CloudCollection());
 
@@ -171,7 +224,7 @@ function setupCesium() {
 
       console.log("Cloud separation updated dynamically.");
     }
-
+    enableDragDrop();
     addClouds(); // Añadir nubes iniciales
 
     const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
