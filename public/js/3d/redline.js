@@ -1,8 +1,486 @@
 
 
+function openSaveDrawingModal() {
+  console.log('Botón de guardar dibujo clickeado'); // Añade esta línea
+  document.getElementById('saveDrawingModal').classList.add('is-active');
+}
+
+// Función para cerrar el modal de guardar dibujo
+function closeSaveDrawingModal() {
+  document.getElementById('saveDrawingModal').classList.remove('is-active');
+}
+
+// Función para guardar el dibujo actual
+async function saveCurrentDrawing() {
+  const drawingName = document.getElementById('drawingNameInput').value;
+  if (!drawingName) {
+    alert('Please enter a name for the drawing.');
+    return;
+  }
+
+  const drawingEntities = [];
+  const entities = cesiumViewer.entities.values;
+
+  console.log('Todas las entidades en el viewer:', entities); // Añade esta línea
+
+  for (const entity of entities) {
+    if (entity.polyline || entity.polygon || entity.point || entity.label || entity.ellipse || entity.model) {
+      drawingEntities.push(entity);
+    }
+  }
+
+  console.log('Entidades de dibujo encontradas:', drawingEntities); // Añade esta línea
+
+  if (drawingEntities.length === 0) {
+    alert('No drawings to save.');
+    closeSaveDrawingModal();
+    return;
+  }
+
+  const features = [];
+  for (const entity of drawingEntities) {
+    let geometry = [];
+    let properties = {};
+
+    console.log('Procesando entidad:', entity); // Añade esta línea
+
+    if (entity.polyline) {
+      console.log('Es una polilínea. Propiedades:', entity.polyline); // Añade esta línea
+      const positions = entity.polyline.positions.getValue(Cesium.JulianDate.now());
+      console.log('Posiciones de la polilínea antes del filtro:', positions); // Añade esta línea
+      const definedPositions = positions.filter(position => Cesium.defined(position));
+      console.log('Posiciones definidas de la polilínea:', definedPositions); // Añade esta línea
+      const coordinates = definedPositions
+        .map(cartesian => {
+          console.log('Cartesian antes de fromCartesian (polyline):', cartesian); // Añade esta línea
+          return Cesium.Cartographic.fromCartesian(cartesian);
+        })
+        .filter(cartographic => Cesium.defined(cartographic))
+        .map(cartographic => [
+          Cesium.Math.toDegrees(cartographic.longitude),
+          Cesium.Math.toDegrees(cartographic.latitude),
+          cartographic.height
+        ]);
+      geometry = { type: 'LineString', coordinates: coordinates };
+      properties = {
+        color: entity.polyline.material.color.getValue(Cesium.JulianDate.now()).toCssColorString(),
+        width: entity.polyline.width.getValue(),
+        style: entity.polyline.material.hasOwnProperty('dashPattern') ? 'dashed' : 'solid'
+      };
+    } else if (entity.polygon) {
+      console.log('Es un polígono. Propiedades:', entity.polygon); // Añade esta línea
+      const hierarchy = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
+      console.log('Jerarquía del polígono antes del filtro:', hierarchy); // Añade esta línea
+      if (hierarchy && hierarchy.positions) {
+        console.log('Posiciones de la jerarquía del polígono antes del filtro:', hierarchy.positions); // Añade esta línea
+        const definedPositions = hierarchy.positions.filter(position => Cesium.defined(position));
+        console.log('Posiciones definidas del polígono:', definedPositions); // Añade esta línea
+
+        // Inspeccionar cada posición individualmente
+        definedPositions.forEach((position, index) => {
+          console.log(`Posición ${index}:`, position); // Añade esta línea
+          if (position) {
+            console.log(`  x: ${position.x}, y: ${position.y}, z: ${position.z}`); // Intenta acceder a las propiedades
+            console.log(`  toString(): ${position.toString()}`); // Ver la representación en string
+          } else {
+            console.log(`  La posición ${index} es null o undefined.`);
+          }
+        });
+
+        const coordinates = definedPositions
+          .map(cartesian => {
+            console.log('Cartesian antes de fromCartesian (polygon):', cartesian); // Añade esta línea
+            return Cesium.Cartographic.fromCartesian(cartesian);
+          })
+          .filter(cartographic => Cesium.defined(cartographic))
+          .map(cartographic => [
+            Cesium.Math.toDegrees(cartographic.longitude),
+            Cesium.Math.toDegrees(cartographic.latitude),
+            cartographic.height || 0 // Añade altura si está disponible
+          ]);
+
+        // Asegurar que el polígono esté cerrado añadiendo la primera coordenada al final si no está ya
+        if (coordinates.length > 0) {
+          const firstCoordinate = coordinates[0];
+          const lastCoordinate = coordinates[coordinates.length - 1];
+          // Comparar si la primera y la última coordenada son diferentes
+          if (firstCoordinate[0] !== lastCoordinate[0] || firstCoordinate[1] !== lastCoordinate[1] || firstCoordinate[2] !== lastCoordinate[2]) {
+            coordinates.push([...firstCoordinate]); // Añadir una copia de la primera coordenada
+          }
+        }
+
+        geometry = { type: 'Polygon', coordinates: [coordinates] };
+        properties = {
+          color: entity.polygon.material.color.getValue(Cesium.JulianDate.now()).toCssColorString(),
+        };
+        if (Cesium.defined(entity.polygon.extrudedHeight)) {
+          properties.extrudedHeight = entity.polygon.extrudedHeight.getValue();
+        }
+      }
+    } else if (entity.point) {
+      const position = Cesium.Cartographic.fromCartesian(entity.position.getValue(Cesium.JulianDate.now()));
+      geometry = {
+        type: 'Point',
+        coordinates: [
+          Cesium.Math.toDegrees(position.longitude),
+          Cesium.Math.toDegrees(position.latitude),
+          position.height
+        ]
+      };
+      properties = {
+        color: entity.point.color.getValue(Cesium.JulianDate.now()).toCssColorString(),
+        pixelSize: entity.point.pixelSize.getValue(),
+        height: entity.position.getValue(Cesium.JulianDate.now()).z // Obtener la altura
+      };
+    } else if (entity.label) {
+      const position = Cesium.Cartographic.fromCartesian(entity.position.getValue(Cesium.JulianDate.now()));
+      geometry = {
+        type: 'Point',
+        coordinates: [
+          Cesium.Math.toDegrees(position.longitude),
+          Cesium.Math.toDegrees(position.latitude),
+          position.height
+        ]
+      };
+      properties = {
+        text: entity.label.text.getValue(),
+        color: entity.label.fillColor.getValue(Cesium.JulianDate.now()).toCssColorString(),
+        size: entity.label.font.getValue().match(/(\d+)px/)?.[1]
+      };
+    } else if (entity.ellipse) {
+      const position = Cesium.Cartographic.fromCartesian(entity.position.getValue(Cesium.JulianDate.now()));
+      geometry = {
+        type: 'Point',
+        coordinates: [
+          Cesium.Math.toDegrees(position.longitude),
+          Cesium.Math.toDegrees(position.latitude),
+          position.height
+        ]
+      };
+      properties = {
+        color: entity.ellipse.material.color.getValue(Cesium.JulianDate.now()).toCssColorString(),
+        radius: entity.ellipse.semiMajorAxis.getValue() // Suponiendo que es un círculo
+      };
+    } else if (entity.model) {
+      console.log('GUARDANDO: Procesando entidad de modelo:', entity.id); // <-- LOG
+
+      console.log('Es un modelo GLTF. Propiedades:', entity.model);
+      const position = entity.position.getValue(Cesium.JulianDate.now());
+      const cartographicPosition = Cesium.Cartographic.fromCartesian(position);
+      const longitude = Cesium.Math.toDegrees(cartographicPosition.longitude);
+      const latitude = Cesium.Math.toDegrees(cartographicPosition.latitude);
+      const height = cartographicPosition.height;
+      const modelUrl = entity.model.uri.getValue();
+      console.log('GUARDANDO: URL del modelo obtenida:', modelUrl); // <-- LOG
+      if (!modelUrl) {
+        console.error('GUARDANDO: ¡URL del modelo está vacía!', entity.id); // <-- ERROR LOG
+      }
+
+      geometry = { type: 'Model', coordinates: [longitude, latitude, height] };
+      properties = {
+        gltfModelUrl: modelUrl,
+        scale: entity.model.scale ? entity.model.scale.getValue() : 1.0,
+        minimumPixelSize: entity.model.minimumPixelSize ? entity.model.minimumPixelSize.getValue() : 0,
+        maximumScale: entity.model.maximumScale ? entity.model.maximumScale.getValue() : 1.0,
+      };
+    }
+
+    if (geometry) {
+      features.push({ type: 'Feature', geometry: geometry, properties: properties });
+    }
+  }
+
+  const geojson = { type: 'FeatureCollection', features: features };
+
+  try {
+    const response = await fetch('/3d/api/save-drawing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: drawingName, geojson: geojson }),
+    });
+
+    const data = await response.json();
+    alert(data.message);
+    closeSaveDrawingModal();
+  } catch (error) {
+    console.error('Error saving drawing:', error);
+    alert('Failed to save drawing.');
+  }
+}
+
+//showing drawings
+
+// Función para abrir el modal de cargar dibujo
+function openLoadDrawingModal() {
+  console.log('Botón de cargar dibujo clickeado');
+  document.getElementById('loadDrawingModal').classList.add('is-active');
+  loadDrawingList(); // Cargar la lista de dibujos al abrir el modal
+}
+
+// Función para cerrar el modal de cargar dibujo
+function closeLoadDrawingModal() {
+  document.getElementById('loadDrawingModal').classList.remove('is-active');
+}
+
+// Función para cargar la lista de dibujos guardados desde el servidor
+async function loadDrawingList() {
+  const savedDrawingsListDiv = document.getElementById('savedDrawingsList');
+  savedDrawingsListDiv.innerHTML = '<p>Cargando lista de dibujos...</p>';
+  try {
+    const response = await fetch('/3d/api/load-drawings');
+    console.log('Respuesta del servidor:', response); // Añade esta línea
+    const data = await response.json();
+    console.log('Datos recibidos del servidor:', data); // Añade esta línea
+    if (data.drawings && data.drawings.length > 0) {
+      savedDrawingsListDiv.innerHTML = '';
+      const ul = document.createElement('ul');
+      data.drawings.forEach(drawingName => {
+        console.log('Nombre del dibujo en el bucle:', drawingName); // Añade esta línea
+        const li = document.createElement('li');
+
+        const loadButton = document.createElement('button');
+        loadButton.textContent = drawingName;
+        loadButton.classList.add('button', 'is-small');
+        loadButton.style.marginBottom = '5px';
+        loadButton.onclick = () => loadSelectedDrawing(drawingName);
+        li.appendChild(loadButton);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Eliminar';
+        deleteButton.classList.add('button', 'is-small', 'is-danger');
+        deleteButton.style.marginBottom = '5px';
+        deleteButton.style.marginLeft = '5px';
+        deleteButton.onclick = () => confirmDeleteDrawing(drawingName);
+        li.appendChild(deleteButton);
+
+        const downloadButton = document.createElement('button');
+        downloadButton.textContent = 'Descargar';
+        downloadButton.classList.add('button', 'is-small', 'is-info');
+        downloadButton.style.marginBottom = '5px';
+        downloadButton.style.marginLeft = '5px';
+        downloadButton.onclick = () => downloadDrawing(drawingName); // Llama a la función de descarga
+        li.appendChild(downloadButton);
+
+        const divButtons = document.createElement('div');
+        divButtons.classList.add('buttons');
+        divButtons.appendChild(loadButton);
+        divButtons.appendChild(deleteButton);
+        divButtons.appendChild(downloadButton);
+        li.appendChild(divButtons);
+
+        ul.appendChild(li);
+      });
+      savedDrawingsListDiv.appendChild(ul);
+    } else {
+      savedDrawingsListDiv.innerHTML = '<p>No se encontraron dibujos guardados.</p>';
+    }
+  } catch (error) {
+    console.error('Error al cargar la lista de dibujos:', error);
+    savedDrawingsListDiv.innerHTML = '<p>Error al cargar la lista de dibujos.</p>';
+  }
+}
+
+// Función para descargar el dibujo como GeoJSON
+async function downloadDrawing(drawingName) {
+  try {
+    const response = await fetch(`/3d/api/load-drawings?name=${encodeURIComponent(drawingName)}`);
+    const data = await response.json();
+    if (data && data.geojson) {
+      const geojsonString = JSON.stringify(data.geojson, null, 2);
+      const blob = new Blob([geojsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${drawingName}.geojson`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      alert('Error al obtener el dibujo para descargar.');
+    }
+  } catch (error) {
+    console.error('Error al descargar el dibujo:', error);
+    alert('Error al descargar el dibujo.');
+  }
+}
+
+// Función para confirmar la eliminación del dibujo
+function confirmDeleteDrawing(drawingName) {
+  if (confirm('Are you sure you want to delete this drawing?')) {
+    deleteDrawing(drawingName);
+  }
+}
+
+// Función para eliminar el dibujo del servidor
+async function deleteDrawing(drawingName) {
+  try {
+    const response = await fetch(`/3d/api/delete-drawing?name=${encodeURIComponent(drawingName)}`, {
+      method: 'DELETE',
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      alert(`Drawing "${drawingName}" deleted.`);
+      loadDrawingList(); // Recargar la lista de dibujos después de eliminar
+    } else {
+      alert(`Error deleting drawing "${drawingName}": ${data.message}`);
+    }
+  } catch (error) {
+    console.error('Error al eliminar el dibujo:', error);
+    alert(`Error deleting drawing "${drawingName}".`);
+  }
+}
+
+// Función para cargar el dibujo seleccionado desde el servidor y añadirlo al mapa
+async function loadSelectedDrawing(drawingName) {
+  try {
+    const response = await fetch(`/3d/api/load-drawings?name=${encodeURIComponent(drawingName)}`); // Reemplaza con la ruta correcta a tu API
+    const data = await response.json();
+    if (data && data.geojson && data.geojson.features) {
+      addGeoJsonToMap(data.geojson);
+      closeLoadDrawingModal();
+      alert(`Dibujo "${drawingName}" cargado.`);
+    } else {
+      alert('Error al cargar el dibujo seleccionado.');
+    }
+  } catch (error) {
+    console.error('Error al cargar el dibujo seleccionado:', error);
+    alert('Error al cargar el dibujo seleccionado.');
+  }
+}
+
+// Función para añadir features de GeoJSON al mapa de Cesium
+function addGeoJsonToMap(geojson) {
+  geojson.features.forEach(feature => {
+    const geometryType = feature.geometry.type;
+    const coordinates = feature.geometry.coordinates;
+    const properties = feature.properties || {};
+
+    if (geometryType === 'LineString') {
+      const positions = coordinates.map(coord => Cesium.Cartesian3.fromDegrees(coord[0], coord[1], coord[2] || 0));
+      let alpha = 1.0;
+      if (properties.transparency !== undefined) {
+        const parsedTransparency = parseFloat(properties.transparency);
+        if (!isNaN(parsedTransparency)) {
+          alpha = parsedTransparency;
+        }
+      } else if (lineTransparency !== undefined) {
+        const parsedLineTransparency = parseFloat(lineTransparency);
+        if (!isNaN(parsedLineTransparency)) {
+          alpha = parsedLineTransparency;
+        }
+      }
+      cesiumViewer.entities.add({
+        polyline: {
+          positions: positions,
+          material: Cesium.Color.fromCssColorString(properties.color || lineColor).withAlpha(alpha),
+          width: properties.width || lineWidth,
+          clampToGround: true,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, properties.zoom || lineZoom)
+        }
+      });
+    } else if (geometryType === 'Polygon') {
+      const rings = coordinates.map(ring => ring.map(coord => Cesium.Cartesian3.fromDegrees(coord[0], coord[1], coord[2] || 0)));
+      let alpha = 1.0;
+      if (properties.transparency !== undefined) {
+        const parsedTransparency = parseFloat(properties.transparency);
+        if (!isNaN(parsedTransparency)) {
+          alpha = parsedTransparency;
+        }
+      } else if (polygonTransparency !== undefined) {
+        const parsedPolygonTransparency = parseFloat(polygonTransparency);
+        if (!isNaN(parsedPolygonTransparency)) {
+          alpha = parsedPolygonTransparency;
+        }
+      }
+      cesiumViewer.entities.add({
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(rings[0], rings.slice(1).map(r => new Cesium.PolygonHierarchy(r))),
+          material: Cesium.Color.fromCssColorString(properties.color || polygonColor).withAlpha(alpha),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          extrudedHeight: properties.extrudedHeight,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, properties.zoom || polygonZoom)
+        }
+      });
+    } else if (geometryType === 'Point') {
+      let alpha = 1.0;
+      if (properties.transparency !== undefined) {
+        const parsedTransparency = parseFloat(properties.transparency);
+        if (!isNaN(parsedTransparency)) {
+          alpha = parsedTransparency;
+        }
+      } else if (pointTransparency !== undefined) {
+        const parsedPointTransparency = parseFloat(pointTransparency);
+        if (!isNaN(parsedPointTransparency)) {
+          alpha = parsedPointTransparency;
+        }
+      }
+      cesiumViewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], coordinates[2] || 0),
+        point: {
+          color: Cesium.Color.fromCssColorString(properties.color || pointColor).withAlpha(alpha),
+          pixelSize: properties.pixelSize || pointSize,
+          heightReference: properties.height === 0 ? Cesium.HeightReference.CLAMP_TO_GROUND : Cesium.HeightReference.NONE,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, properties.zoom || pointZoom)
+        }
+      });
+    } else if (geometryType === 'Label') {
+      cesiumViewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], coordinates[2] || 0),
+        label: {
+          text: properties.text || textValue,
+          font: `${properties.size || textSize}px sans-serif`,
+          fillColor: Cesium.Color.fromCssColorString(properties.color || textColor).withAlpha(parseFloat(properties.transparency || textTransparency)),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, properties.zoom || textZoom),
+          heightReference: properties.height === 0 ? Cesium.HeightReference.CLAMP_TO_GROUND : Cesium.HeightReference.NONE
+        }
+      });
+    } else if (geometryType === 'Ellipse') {
+      cesiumViewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(coordinates[0], coordinates[1], coordinates[2] || 0),
+        ellipse: {
+          semiMajorAxis: properties.radius || circleRadius,
+          semiMinorAxis: properties.radius || circleRadius,
+          material: Cesium.Color.fromCssColorString(properties.color || circleColor).withAlpha(parseFloat(properties.transparency || circleTransparency)),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, properties.zoom || circleZoom)
+        }
+      });
+    } else if (geometryType === 'Model') {
+      const longitude = coordinates[0];
+      const latitude = coordinates[1];
+      const height = coordinates[2] || 0;
+      const modelUrl = properties.gltfModelUrl;
+      const scale = properties.scale || 1.0;
+      const minimumPixelSize = properties.minimumPixelSize || 0;
+      const maximumScale = properties.maximumScale || 1.0;
+
+      if (modelUrl) {
+        cesiumViewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(longitude, latitude, height),
+          model: {
+            uri: modelUrl,
+            scale: scale,
+            minimumPixelSize: minimumPixelSize,
+            maximumScale: maximumScale,
+            allowPicking: true
+          },
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 50000.0) // Ajusta la distancia si es necesario
+        });
+      }
+    }
+    // Puedes añadir más tipos de geometría si es necesario
+  });
+}
+
+
+
 // Remover el doble clic predeterminado en Cesium
 cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-let selectedModel = null;
+window.selectedModel = null;
 var handler;
 var activeTool = null;
 var activeShapePoints = [];
@@ -22,7 +500,7 @@ var polygonColor = "#00FF00";
 var polygonZoom = 1000;
 var polygonTransparency = 1;
 var extrudedColor = "#FFA500";
-var extrudedHeight = 30000;
+var extrudedHeight = 5;
 var extrudedZoom = 1000;
 var extrudedTransparency = 1;
 var textColor = "#FFFFFF";
@@ -35,56 +513,169 @@ var circleColor = "#FF69B4";
 var circleRadius = 1000;
 var circleZoom = 1000;
 var circleTransparency = 1;
+var activeVertexEntities = []; 
 
 
 window.toggleTool = toggleTool;
+window.closeDrawingTools = closeDrawingTools; // Exponer la nueva función al window
 
-document.addEventListener("DOMContentLoaded", function () {
-  // Llamar `toggleTool` al hacer clic en los botones de la barra de herramientas
-  document.querySelectorAll('#toolbarContainer button').forEach(button => {
-    button.addEventListener('click', function () {
-      const tool = this.id.replace('Button', '');
-      toggleTool(tool);
-    });
-  });
-});
-
-// Función para activar y desactivar herramientas
-function toggleTool(tool) {
-  deactivateTool();
-  if (tool === activeTool) {
-    return; // Si la herramienta ya está activa, salir
+// Función para mostrar las herramientas de dibujo
+function showDrawingTools() {
+  var toolbarContainer = document.getElementById('toolbarContainer');
+  if (toolbarContainer) {
+    toolbarContainer.style.display = 'block';
   }
+}
 
-  if (tool === 'gltfModel') {
-    loadGltfModels();
-    document.getElementById('inputDialogModel').style.display = 'block';
-  } else {
-    const dialogMap = {
-      point: 'inputDialog',
-      line: 'inputDialogLine',
-      polygon: 'inputDialogPolygon',
-      extrudedPolygon: 'inputDialogExtruded',
-      text: 'inputDialogText',
-      circle: 'inputDialogCircle'
-    };
-    if (dialogMap[tool]) {
-      document.getElementById(dialogMap[tool]).style.display = 'block';
+// Función para cerrar todos los diálogos de configuración de herramientas
+function closeAllDialogs() {
+  console.log("[DEBUG] closeAllDialogs llamado"); // Log opcional para depuración
+  const dialogIds = [
+    'inputDialog',
+    'inputDialogModel',
+    'inputDialogLine',
+    'inputDialogPolygon',
+    'inputDialogExtruded',
+    'inputDialogText',
+    // 'inputDialogRectangle', // Si tienes este diálogo, inclúyelo
+    'inputDialogCircle'
+    // Añade aquí los IDs de cualquier otro diálogo de configuración que tengas
+  ];
+
+  dialogIds.forEach(id => {
+    const dialog = document.getElementById(id);
+    if (dialog) {
+      // La forma más simple es usar style.display = 'none'.
+      // Esto generalmente funciona tanto para divs normales como para modales de Bulma.
+      dialog.style.display = 'none';
+
+      // Si usas modales de Bulma y quieres ser más explícito (opcional):
+      // if (dialog.classList.contains('modal')) {
+      //    dialog.classList.remove('is-active');
+      // }
+    } else {
+      // Advertencia si un ID esperado no se encuentra, puede indicar un error tipográfico en la lista.
+      console.warn(`[DEBUG] Diálogo con ID "${id}" no encontrado en closeAllDialogs.`);
     }
+  });
+}
+
+// Función para activar/desactivar y mostrar el diálogo correcto
+function toggleTool(tool) {
+  console.log(`[DEBUG] toggleTool iniciado para: ${tool}`); // <-- LOG
+
+  // Si haces clic en la misma herramienta activa, desactívala.
+  if (tool === activeTool) {
+    console.log(`[DEBUG] Desactivando la herramienta actual: ${tool}`);
+    deactivateTool();
+    closeAllDialogs(); // Cierra el diálogo al desactivar
+    return;
   }
-  activeTool = tool;
+
+  // Desactivar herramienta anterior ANTES de activar la nueva
+  deactivateTool();
+  activeTool = tool; // Establece la nueva herramienta activa
+
+  showDrawingTools(); // Asegura que la barra esté visible
+
+  // Resalta el botón activo (opcional)
+  document.getElementById(tool + 'Button')?.classList.add('is-active');
+
+  // Mapeo de herramienta a ID de diálogo
+  const dialogMap = {
+    point: 'inputDialog', // <--- Asegúrate que este ID existe en tu HTML!
+    gltfModel: 'inputDialogModel',
+    line: 'inputDialogLine',
+    polygon: 'inputDialogPolygon',
+    extrudedPolygon: 'inputDialogExtruded',
+    text: 'inputDialogText',
+    circle: 'inputDialogCircle'
+    // Añade otros si existen
+  };
+
+  if (dialogMap[tool]) {
+    const dialogId = dialogMap[tool];
+    console.log(`[DEBUG] Mapeo encontrado. Dialog ID: ${dialogId}`); // <-- LOG
+
+    // Lógica específica ANTES de abrir el diálogo
+    if (tool === 'gltfModel') {
+      loadGltfModels(); // Carga modelos al abrir su diálogo
+    } else if (tool === 'point') {
+      // Llama a la función que actualiza la UI interna del diálogo de puntos
+      handlePointTypeChange(); // Muestra/oculta campos Icon/Standard
+      const pointType = document.querySelector('input[name="pointType"]:checked')?.value;
+      if (pointType === 'icon') {
+        loadAvailableIcons(); // Carga iconos si el tipo icono está seleccionado
+      }
+    }
+    // Abre el diálogo correspondiente
+    openDialog(dialogId);
+  } else {
+    console.warn(`[DEBUG] No hay diálogo mapeado para la herramienta: ${tool}`);
+    // Manejo de herramientas sin diálogo (como 'clear')
+    if (tool === 'clear') {
+      clearEntities();
+      activeTool = null; // 'clear' no permanece activo
+      // No necesitas llamar a deactivateTool aquí porque ya se hizo al principio
+      return;
+    }
+    // Si una herramienta debería tener diálogo pero no está en el map
+    console.error(`Tool ${tool} seleccionado pero no se encontró diálogo configurado.`);
+    activeTool = null; // No dejar la herramienta activa si falta configuración
+  }
+}
+
+// Función para abrir un diálogo específico (modal o div)
+function openDialog(dialogId) {
+  console.log(`[DEBUG] openDialog llamado con ID: ${dialogId}`); // <-- LOG
+  closeAllDialogs(); // Cierra otros diálogos primero (BUENA PRÁCTICA)
+  const dialog = document.getElementById(dialogId);
+  console.log(`[DEBUG] Buscando elemento con ID: ${dialogId}. Encontrado:`, dialog); // <-- LOG
+
+  if (dialog) {
+    // Verifica si es un modal de Bulma
+    if (dialog.classList.contains('modal')) {
+      dialog.classList.add('is-active');
+      console.log(`[DEBUG] Añadida clase 'is-active' al modal. Clases actuales:`, dialog.classList); // <-- LOG
+    } else {
+      // Si no es modal, asume que es un div normal y usa display
+      dialog.style.display = 'block';
+      console.log(`[DEBUG] Establecido display='block' al div.`); // <-- LOG
+    }
+    console.log(`[DEBUG] Diálogo abierto: ${dialogId}`);
+  } else {
+    // ¡Este error es una causa muy probable si el diálogo no se abre!
+    console.error(`[DEBUG] ¡ERROR! Diálogo con ID "${dialogId}" no encontrado en el DOM.`); // <-- LOG
+    alert(`Error: No se encontró el panel de configuración para esta herramienta (${dialogId}).`); // Informa al usuario
+    // Podrías querer desactivar la herramienta si su diálogo no existe
+    // deactivateTool(); // Descomentar si es el comportamiento deseado
+  }
+}
+
+// Nueva función para cerrar las herramientas de dibujo y desactivar la herramienta activa
+function closeDrawingTools() {
+  deactivateTool();
+  var toolbarContainer = document.getElementById('toolbarContainer');
+  if (toolbarContainer) {
+    toolbarContainer.style.display = 'none'; // Ocultar la barra de herramientas si lo deseas al cerrar
+  }
 }
 
 // Función para desactivar la herramienta
 function deactivateTool() {
+  console.log("deactivateTool: Ejecutando..."); // <-- AÑADIR LOG
   if (activeTool) {
     document.getElementById(activeTool + 'Button')?.classList.remove('active');
   }
   activeTool = null;
+  console.log("deactivateTool: Handler antes de destruir:", handler); // <-- AÑADIR LOG
   if (handler) {
     handler.destroy();
     handler = null;
-  }
+    console.log("deactivateTool: Handler destruido."); // <-- AÑADIR LOG
+  } else {
+    console.log("deactivateTool: No había handler que destruir."); // <-- AÑADIR LOG
+  };
   activeShapePoints = [];
   activeShape = null;
   floatingPoint = null;
@@ -98,12 +689,17 @@ function deactivateTool() {
 }
 
 // Llamar `toggleTool` al hacer clic en los botones de la barra de herramientas
-document.querySelectorAll('#toolbarContainer button').forEach(button => {
-  button.addEventListener('click', function () {
-    const tool = this.id.replace('Button', '');
-    toggleTool(tool);
+const toolbar = document.getElementById('toolbar');
+if (toolbar) {
+  Array.from(toolbar.children).forEach(button => {
+    if (button.id !== 'closeDrawingToolsButton') { // Excluir el botón de cerrar
+      button.addEventListener('click', function () {
+        const tool = this.id.replace('Button', '');
+        toggleTool(tool);
+      });
+    }
   });
-});
+}
 
 // Cargar modelos GLTF en el selector
 async function loadGltfModels() {
@@ -123,12 +719,6 @@ async function loadGltfModels() {
   }
 }
 
-
-
-
-
-
-
 // Aplicar configuración del modelo GLTF y mantener la ventana abierta
 function applyModelSettings() {
   const modelUrl = document.getElementById('gltfModelSelect').value;
@@ -136,14 +726,18 @@ function applyModelSettings() {
     // Guarda el modelo seleccionado en una variable global
     window.selectedGltfModelUrl = modelUrl;
     showMessage("Click on the map to place the GLTF model.");
-    activateTool('gltfModel'); // Activa la herramienta para permitir la selección en el mapa
+    activateToolHandler('gltfModel'); // Activa la herramienta para permitir la selección en el mapa
   }
 }
 
-// Modificar la función `activateTool` para mantener la herramienta activa
-function activateTool(tool) {
-  activeTool = tool;
-  document.getElementById(tool + 'Button').classList.add('active'); // Añade la clase activa al botón
+// Modificar la función `activateTool` a `activateToolHandler` para manejar la activación de la herramienta
+function activateToolHandler(tool) {
+  console.log(`[DEBUG] activateToolHandler llamado para: ${tool}`); // Log
+  if (handler) {
+    console.log("[DEBUG] activateToolHandler: Destruyendo handler existente antes de crear uno nuevo.");
+    handler.destroy();
+    handler = null;
+  }
 
   if (cesiumViewer && cesiumViewer.scene && cesiumViewer.scene.canvas) {
     handler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
@@ -153,22 +747,31 @@ function activateTool(tool) {
   }
 
   handler.setInputAction(function (event) {
+    console.log(`[DEBUG] activateToolHandler llamado para: ${tool}`); // Log
+
     var earthPosition = cesiumViewer.scene.pickPosition(event.position);
     if (Cesium.defined(earthPosition)) {
-      if (activeTool === 'point') {
+      if (tool === 'point') {
         createPoint(earthPosition);
-      } else if (activeTool === 'gltfModel' && window.selectedGltfModelUrl) {
+      } else if (tool === 'gltfModel' && window.selectedGltfModelUrl) {
         // Coloca el modelo GLTF en la posición del clic
         createGltfModel(earthPosition, window.selectedGltfModelUrl);
         // La herramienta permanece activa para permitir más clics y añadir más modelos
-      } else if (activeTool === 'text') {
+      } else if (tool === 'text') {
         createText(earthPosition);
-      } else {
+      } else if (tool === 'circle') {
+        if (activeShapePoints.length === 0) {
+          activeShapePoints.push(earthPosition);
+          floatingPoint = createFloatingPoint(earthPosition);
+          activeShape = createShape(activeShapePoints); // Para el círculo, el primer clic establece el centro
+        }
+      }
+      else {
         if (activeShapePoints.length === 0) {
           floatingPoint = createFloatingPoint(earthPosition);
           activeShapePoints.push(earthPosition);
           var dynamicPositions = new Cesium.CallbackProperty(function () {
-            return activeTool === 'line' ? activeShapePoints : new Cesium.PolygonHierarchy(activeShapePoints);
+            return tool === 'line' ? activeShapePoints : new Cesium.PolygonHierarchy(activeShapePoints);
           }, false);
           activeShape = createShape(dynamicPositions);
         }
@@ -181,26 +784,41 @@ function activateTool(tool) {
     if (Cesium.defined(activeShape)) {
       var newPosition = cesiumViewer.scene.pickPosition(event.endPosition);
       if (Cesium.defined(newPosition)) {
-        activeShapePoints.pop();
-        activeShapePoints.push(newPosition);
+        if (tool === 'circle') {
+          // Para el círculo, actualiza el radio basado en la posición del mouse
+          if (activeShapePoints.length > 0) {
+            const center = activeShapePoints[0];
+            const radius = Cesium.Cartesian3.distance(center, newPosition);
+            activeShape.ellipse.semiMajorAxis = radius;
+            activeShape.ellipse.semiMinorAxis = radius;
+          }
+        } else {
+          activeShapePoints.pop();
+          activeShapePoints.push(newPosition);
+        }
       }
     }
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
   handler.setInputAction(function (event) {
     const pickedObject = cesiumViewer.scene.pick(event.position);
     if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.id)) {
-        const entity = pickedObject.id;
-        if (entity.model && entity.model.uri) {
-            // Es un modelo GLTF, eliminarlo
-            cesiumViewer.entities.remove(entity);
-            showMessage("GLTF model removed.");
-        } else if (entity.properties && entity.properties.isSimulation) {
-            // Es una línea de simulación, eliminarla
-            cesiumViewer.entities.remove(entity);
-            showMessage("Simulation line removed.");
-        }
+      const entity = pickedObject.id;
+      if (entity.model && entity.model.uri) {
+        // Es un modelo GLTF, eliminarlo
+        cesiumViewer.entities.remove(entity);
+        showMessage("GLTF model removed.");
+      } else if (entity.properties && entity.properties.isSimulation) {
+        // Es una línea de simulación, eliminarla
+        cesiumViewer.entities.remove(entity);
+        showMessage("Simulation line removed.");
+      } else if (entity.properties && entity.properties.isDrawing) { // Añadida condición para eliminar objetos de dibujo
+        // Es un objeto de dibujo, eliminarlo
+        cesiumViewer.entities.remove(entity);
+        showMessage("Drawing object removed.");
+      }
     }
-}, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
 
   handler.setInputAction(function () {
     finalizeShape();
@@ -209,14 +827,10 @@ function activateTool(tool) {
 
 // Función para cerrar el diálogo y desactivar la herramienta
 function closeModelDialog() {
+  console.log("closeModelDialog: Ejecutando..."); // <-- AÑADIR LOG
   document.getElementById('inputDialogModel').style.display = 'none';
-  deactivateTool(); // Desactiva la herramienta al cerrar el diálogo
+  deactivateTool();
 }
-
-// Modificar el botón de cerrar en HTML para llamar a `closeModelDialog`
-
-
-
 
 function createPoint(worldPosition) {
   return cesiumViewer.entities.add({
@@ -230,6 +844,9 @@ function createPoint(worldPosition) {
       pixelSize: pointSize,
       heightReference: pointHeight === 0 ? Cesium.HeightReference.CLAMP_TO_GROUND : Cesium.HeightReference.NONE,
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, pointZoom)
+    },
+    properties: { // Añadir propiedad
+      isDrawing: true
     }
   });
 }
@@ -290,7 +907,7 @@ function createShape(positionData) {
       }
     });
   } else if (activeTool === 'circle') {
-    return cesiumViewer.entities.add({
+    entityOptions = {
       position: positionData[0],
       ellipse: {
         semiMajorAxis: circleRadius,
@@ -299,8 +916,12 @@ function createShape(positionData) {
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, circleZoom)
       }
-    });
+    };
   }
+  entityOptions.properties = { // Añadir propiedad
+    isDrawing: true
+  };
+  return cesiumViewer.entities.add(entityOptions);
 }
 
 function finalizeShape() {
@@ -357,6 +978,9 @@ function createText(worldPosition) {
       fillColor: new Cesium.Color.fromCssColorString(textColor).withAlpha(textTransparency),
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, textZoom),
       heightReference: textHeight === 0 ? Cesium.HeightReference.CLAMP_TO_GROUND : Cesium.HeightReference.NONE
+    },
+    properties: { // Añadir propiedad
+      isDrawing: true
     }
   });
 }
@@ -369,7 +993,7 @@ function applyPointSettings() {
   pointTransparency = parseFloat(document.getElementById('pointTransparencyInput').value);
   document.getElementById('inputDialog').style.display = 'none';
   showMessage("Click to place a point on the map.");
-  activateTool('point');
+  activateToolHandler('point');;
 }
 
 
@@ -384,7 +1008,7 @@ function applyLineSettings() {
   lineTransparency = parseFloat(document.getElementById('lineTransparencyInput').value);
   document.getElementById('inputDialogLine').style.display = 'none';
   showMessage("Click to start drawing a line. Double-click to finish.");
-  activateTool('line');
+  activateToolHandler('line');;
 }
 
 function applyPolygonSettings() {
@@ -393,7 +1017,7 @@ function applyPolygonSettings() {
   polygonTransparency = parseFloat(document.getElementById('polygonTransparencyInput').value);
   document.getElementById('inputDialogPolygon').style.display = 'none';
   showMessage("Click to start drawing a polygon. Double-click to finish.");
-  activateTool('polygon');
+  activateToolHandler('polygon');;
 }
 
 function applyExtrudedSettings() {
@@ -403,7 +1027,7 @@ function applyExtrudedSettings() {
   extrudedTransparency = parseFloat(document.getElementById('extrudedTransparencyInput').value);
   document.getElementById('inputDialogExtruded').style.display = 'none';
   showMessage("Click to start drawing an extruded polygon. Double-click to finish.");
-  activateTool('extrudedPolygon');
+  activateToolHandler('extrudedPolygon');;
 }
 
 function applyTextSettings() {
@@ -415,7 +1039,7 @@ function applyTextSettings() {
   textTransparency = parseFloat(document.getElementById('textTransparencyInput').value);
   document.getElementById('inputDialogText').style.display = 'none';
   showMessage("Click to place text on the map.");
-  activateTool('text');
+  activateToolHandler('text');
 }
 
 
@@ -427,7 +1051,7 @@ function applyCircleSettings() {
   circleTransparency = parseFloat(document.getElementById('circleTransparencyInput').value);
   document.getElementById('inputDialogCircle').style.display = 'none';
   showMessage("Click to place a circle center, then drag to set the radius.");
-  activateTool('circle');
+  activateToolHandler('circle');
 }
 
 function closeDialog(dialogId) {
@@ -456,22 +1080,6 @@ function toggleToolbox() {
   }
 }
 
-async function loadGltfModels() {
-  try {
-    const response = await fetch('/3d/api/gltf-files');
-    const data = await response.json();
-    const modelSelect = document.getElementById('gltfModelSelect');
-    modelSelect.innerHTML = ''; // Limpiar opciones previas
-    data.files3D.forEach(file => {
-      const option = document.createElement('option');
-      option.value = `/3d/${file.name}`;
-      option.text = file.name;
-      modelSelect.appendChild(option);
-    });
-  } catch (error) {
-    console.error('Error loading GLTF models:', error);
-  }
-}
 
 function createGltfModelAtSelectedLocation(modelUrl) {
   // Supón que worldPosition es la ubicación en el mapa donde se colocará el modelo
@@ -498,7 +1106,7 @@ function createGltfModel(worldPosition, modelUrl) {
     distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0.0, 50000.0)
   });
 
-  selectedModel = modelEntity;
+  window.selectedModel = modelEntity;
 
   // Configurar clic derecho para abrir el cuadro de rotación
   cesiumViewer.screenSpaceEventHandler.setInputAction(function (event) {
@@ -548,5 +1156,12 @@ function applyDynamicRotation() {
   }
 }
 
-
-
+// Configurar el listener del clic derecho para abrir el cuadro de rotación (se ejecuta solo una vez)
+if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id === window.selectedModel) {
+  cesiumViewer.screenSpaceEventHandler.setInputAction(function (event) {
+    const pickedObject = cesiumViewer.scene.pick(event.position);
+    if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id === selectedModel) {
+      openRotationDialog(event.position.x, event.position.y);
+    }
+  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+}

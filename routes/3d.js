@@ -1,6 +1,6 @@
 const express = require('express');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const axios = require('axios');
 const { DOMParser } = require('xmldom'); // Usar xmldom para analizar XML
@@ -15,6 +15,8 @@ const gltfDir = path.join(__dirname, '..', 'data', 'uploaded', '3d');
 
 // Ruta al archivo donde guardaremos las URLs WMS
 const wmsUrlsFilePath = path.join(__dirname, '..', 'data', '3d-jsons', 'wms-urls.json');
+const modelsFilePath = path.join(configDir, '3d-modells.json'); 
+
 
 // Middleware para verificar autenticación
 function isAuthenticated(req, res, next) {
@@ -271,9 +273,6 @@ router.get('/api/terrain-files', (req, res) => {
 });
 
 
-
-
-
 router.get('/api/terrains', (req, res) => {
   const filePath = path.join(configDir, 'default.json');
   const config = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -299,10 +298,15 @@ router.get('/cesium-map', isAuthenticated, async (req, res) => {
 router.get('/api/gltf-files', (req, res) => {
   fs.readdir(gltfDir, (err, files) => {
     if (err) {
+      console.error('Error scanning directory:', gltfDir, err); // Mejor log de error
       return res.status(500).send('Unable to scan directory: ' + err);
     }
-    const gltfFiles = files.filter(file => file.endsWith('.gltf'));
-    res.json({ files3D: gltfFiles.map(file => ({ name: file })) });
+
+    // Filtra para incluir ambas extensiones
+    const modelFiles = files.filter(file => file.endsWith('.gltf') || file.endsWith('.glb'));
+
+    // Devuelve la lista combinada
+    res.json({ files3D: modelFiles.map(file => ({ name: file })) });
   });
 });
 
@@ -786,27 +790,195 @@ router.post('/api/save-local-terrain', async (req, res) => {
   }
 });
 
+// ... (your existing routes)
 
-/* router.post('/api/save-kmz', (req, res) => {
-  const { filename, data } = req.body;
-  const filepath = path.join(__dirname, '..', 'data', 'uploaded', '3d', filename);
+router.post('/api/save-view', async (req, res) => {
+  const { name, position, orientation } = req.body; // Expecting name now
+  const configName = 'default';
+  const filePath = path.join(configDir, `${configName}.json`);
 
-  // Convertimos el archivo KMZ recibido en un buffer sin el uso de await
-  const kmzBlob = new Blob([data], { type: 'application/vnd.google-earth.kmz' });
-  kmzBlob.arrayBuffer().then(buffer => {
-    fs.writeFile(filepath, Buffer.from(buffer), (err) => {
-      if (err) {
-        console.error('Error al guardar el archivo KMZ:', err);
-        res.status(500).json({ message: 'Error al guardar el archivo KMZ' });
-      } else {
-        res.json({ message: 'Archivo KMZ guardado con éxito' });
-      }
-    });
-  }).catch(error => {
-    console.error('Error al procesar el archivo KMZ:', error);
-    res.status(500).json({ message: 'Error al procesar el archivo KMZ' });
+  try {
+      const data = await fs.promises.readFile(filePath, 'utf8');
+      const config = JSON.parse(data);
+
+      // Ensure savedViews array exists
+      config.savedViews = config.savedViews || [];
+      config.savedViews.push({ name, position, orientation }); // Store the name as well
+
+      await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
+      res.json({ message: 'View saved successfully' });
+  } catch (error) {
+      console.error('Error saving view:', error);
+      res.status(500).json({ error: 'Error saving view' });
+  }
+});
+
+router.get('/api/load-views', async (req, res) => {
+  const configName = 'default';
+  const filePath = path.join(configDir, `${configName}.json`);
+
+  try {
+      const data = await fs.promises.readFile(filePath, 'utf8');
+      const config = JSON.parse(data);
+      res.json(config.savedViews || []);
+  } catch (error) {
+      console.error('Error loading views:', error);
+      res.status(500).json({ error: 'Error loading views' });
+  }
+});
+
+router.post('/api/delete-view', async (req, res) => {
+  const { name } = req.body; // Expecting the name of the view to delete
+  const configName = 'default';
+  const filePath = path.join(configDir, `${configName}.json`);
+
+  try {
+    const data = await fs.promises.readFile(filePath, 'utf8');
+    const config = JSON.parse(data);
+
+    if (config.savedViews) {
+      config.savedViews = config.savedViews.filter(view => view.name !== name);
+      await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
+      res.json({ message: 'View deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'No saved views found' });
+    }
+  } catch (error) {
+    console.error('Error deleting view:', error);
+    res.status(500).json({ error: 'Error deleting view' });
+  }
+});
+
+router.post('/api/set-default-view', async (req, res) => {
+  const { name } = req.body;
+  const configName = 'default';
+  const filePath = path.join(configDir, `${configName}.json`);
+
+  try {
+    const data = await fs.promises.readFile(filePath, 'utf8');
+    const config = JSON.parse(data);
+
+    if (config.savedViews) {
+      config.savedViews = config.savedViews.map(view => ({
+        ...view,
+        isDefault: view.name === name
+      }));
+      await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
+      res.json({ message: `View "${name}" set as default successfully` });
+    } else {
+      res.status(404).json({ error: 'No saved views found' });
+    }
+  } catch (error) {
+    console.error('Error setting default view:', error);
+    res.status(500).json({ error: 'Error setting default view' });
+  }
+});
+
+
+//save drawing
+
+router.post('/api/save-drawing', (req, res) => {
+  const { name, geojson } = req.body;
+
+  console.log('Datos recibidos para guardar:', { name, geojson });
+
+  fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
+    if (err) {
+      console.error('Error al leer el archivo:', err);
+      return res.status(500).json({ success: false, message: 'Error al leer el archivo.' });
+    }
+
+    try {
+      const jsonData = JSON.parse(existingData);
+
+      if (!jsonData.drawings) {
+        jsonData.drawings = {};
+      }
+
+      jsonData.drawings[name] = geojson;
+
+      fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
+        if (err) {
+          console.error('Error al guardar el dibujo:', err);
+          return res.status(500).json({ success: false, message: 'Error al guardar el dibujo.' });
+        }
+        res.json({ success: true, message: 'Dibujo guardado exitosamente.' });
+      });
+    } catch (parseError) {
+      console.error('Error al parsear JSON:', parseError);
+      res.status(500).json({ success: false, message: 'Error al parsear JSON.' });
+    }
+  });
+});
+
+router.get('/api/load-drawings', async (req, res) => {
+  try {
+      fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
+          if (err) {
+              console.error('Error al leer el archivo:', err);
+              return res.status(500).json({ success: false, message: 'Error al leer el archivo de dibujos.' });
+          }
+
+          try {
+              const jsonData = JSON.parse(existingData);
+              if (req.query.name) {
+                  // Si se proporciona un nombre, buscar el dibujo específico
+                  const drawingName = req.query.name;
+                  if (jsonData.drawings && jsonData.drawings[drawingName]) {
+                      return res.json({ geojson: jsonData.drawings[drawingName] });
+                  } else {
+                      return res.status(404).json({ message: 'Dibujo no encontrado.' });
+                  }
+              } else {
+                  // Si no se proporciona un nombre, devolver la lista de nombres
+                  const drawingNames = jsonData.drawings ? Object.keys(jsonData.drawings) : [];
+                  return res.json({ drawings: drawingNames });
+              }
+          } catch (parseError) {
+              console.error('Error al parsear JSON:', parseError);
+              return res.status(500).json({ success: false, message: 'Error al parsear el archivo de dibujos JSON.' });
+          }
+      });
+  } catch (error) {
+      console.error('Error en la ruta /load-drawings:', error);
+      res.status(500).json({ message: 'Error al cargar la lista de dibujos.' });
+  }
+});
+
+router.delete('/api/delete-drawing', (req, res) => {
+    const drawingName = req.query.name;
+  
+    if (!drawingName) {
+      return res.status(400).json({ success: false, message: 'Nombre del dibujo no proporcionado.' });
+    }
+  
+    fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
+      if (err) {
+        console.error('Error al leer el archivo:', err);
+        return res.status(500).json({ success: false, message: 'Error al leer el archivo.' });
+      }
+  
+      try {
+        const jsonData = JSON.parse(existingData);
+  
+        if (jsonData.drawings && jsonData.drawings.hasOwnProperty(drawingName)) {
+          delete jsonData.drawings[drawingName];
+  
+          fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
+            if (err) {
+              console.error('Error al guardar el archivo después de eliminar:', err);
+              return res.status(500).json({ success: false, message: 'Error al guardar el archivo.' });
+            }
+            res.json({ success: true, message: `Dibujo "${drawingName}" eliminado exitosamente.` });
+          });
+        } else {
+          return res.status(404).json({ success: false, message: `Dibujo "${drawingName}" no encontrado.` });
+        }
+      } catch (parseError) {
+        console.error('Error al parsear JSON:', parseError);
+        res.status(500).json({ success: false, message: 'Error al parsear JSON.' });
+      }
+    });
   });
-}); */
-
 module.exports = router;
 

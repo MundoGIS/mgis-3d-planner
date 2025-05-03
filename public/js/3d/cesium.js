@@ -76,6 +76,13 @@ function setupCesium() {
       scene.screenSpaceEventHandler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
     }
 
+      // Quitar el imagery por defecto (capa base)
+      cesiumViewer.imageryLayers.removeAll(true);
+
+      // Establecer el color del globo a gris claro
+    cesiumViewer.scene.globe.baseColor = Cesium.Color.LIGHTGRAY;
+
+
 
     function enableDragDrop() {
       if (cesiumViewer) {
@@ -227,8 +234,8 @@ function setupCesium() {
     enableDragDrop();
     addClouds(); // Añadir nubes iniciales
 
-    const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
-    handler.setInputAction((movement) => {
+    //const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+  /*   handler.setInputAction((movement) => {
       if (isPositioningActive) {
         const pickedPosition = scene.pickPosition(movement.position);
         if (Cesium.defined(pickedPosition)) {
@@ -245,7 +252,7 @@ function setupCesium() {
           console.error("Could not pick a valid position on the map.");
         }
       }
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK); */
 
     // Suscripciones a cambios dinámicos
     Cesium.knockout.getObservable(cloudParameters, "baseHeight").subscribe(() => updateCloudsProperties());
@@ -259,6 +266,8 @@ function setupCesium() {
   } catch (error) {
     console.error("Error in setupCesium:", error);
   }
+  // Inicialmente deshabilitamos la funcionalidad de medición
+  //closeMeasureWindow();
 }
 
 

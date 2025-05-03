@@ -7,7 +7,13 @@
     "start": "node --max-old-space-size=8192 app.js",
     "dev": "nodemon app.js"
   },
-  "keywords": ["GIS", "3D", "Cesium", "urban planning", "open source"],
+  "keywords": [
+    "GIS",
+    "3D",
+    "Cesium",
+    "urban planning",
+    "open source"
+  ],
   "author": "MundoGIS",
   "license": "MPL-2.0",
   "dependencies": {
@@ -47,6 +53,7 @@
     "pannellum": "^2.5.6",
     "passport": "^0.6.0",
     "passport-local": "^1.0.0",
+    "pg": "^8.14.1",
     "popper.js": "^1.16.1",
     "proj4": "^2.9.0",
     "querystring": "^0.2.1",

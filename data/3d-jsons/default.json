@@ -12,27 +12,20 @@
         "visible": true
       },
       {
-        "name": "Googles 3D",
-        "type": "3dtiles",
-        "id": "2275207",
-        "url": "https://assets.cesium.com/2275207/tileset.json",
-        "key": 1739371529111,
-        "visible": false
-      },
-      {
         "name": "OSM buildings",
         "type": "3dtiles",
         "id": "96188",
         "url": "https://assets.cesium.com/96188/tileset.json",
         "key": 1739371602225,
-        "visible": true
+        "visible": false
       },
       {
-        "name": "mannen",
-        "type": "glb",
-        "visible": false,
-        "glbName": "Cesium_Man.glb",
-        "key": 1741620056505
+        "name": "Googles",
+        "type": "3dtiles",
+        "id": "2275207",
+        "url": "https://assets.cesium.com/2275207/tileset.json",
+        "key": 1743587886983,
+        "visible": false
       }
     ],
     "terrains": [
@@ -51,5 +44,21 @@
         "visible": false
       }
     ]
-  }
+  },
+  "savedViews": [
+    {
+      "name": "Default view",
+      "position": [
+        7646657.331916487,
+        2199287.744898028,
+        11042194.814816602
+      ],
+      "orientation": {
+        "heading": 0.13484325599741354,
+        "pitch": -1.5691086087817991,
+        "roll": 0
+      },
+      "isDefault": true
+    }
+  ]
 }

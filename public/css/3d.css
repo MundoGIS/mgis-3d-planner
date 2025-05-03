@@ -1,5 +1,6 @@
 /* General */
-html, body {
+html,
+body {
     height: 100%;
     margin: 0;
     padding: 0;
@@ -11,12 +12,10 @@ body {
 }
 
 #cesiumContainer {
-    flex: 1 1 auto; /* Permite que el contenedor crezca y ocupe el espacio disponible */
-    position: relative; /* Para que los elementos absolutamente posicionados dentro sean relativos a este contenedor */
-    display: flex; /* Si es necesario, para que los hijos de #cesiumContainer puedan usar flexbox */
-    flex-direction: column; /* Opcional, según tus necesidades */
-    /* Remueve las alturas fijas */
-    /* height: 100vh; */
+    flex: 1 1 auto;
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 #header {
@@ -41,10 +40,11 @@ body {
 .sidebar-buttons {
     position: absolute;
     left: 40px;
-    top: 15%;
+    top: 5%;
     display: flex;
     flex-direction: column;
     gap: 5px;
+    z-index: 10001;
 }
 
 .sidebar-buttons div {
@@ -60,6 +60,7 @@ body {
     color: white;
     font-size: 20px;
 }
+
 
 /* Tabs */
 .tabs {
@@ -141,17 +142,17 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: 1200; /* Lo suficientemente alto para estar sobre otros elementos */
+    z-index: 1200;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.6); /* Fondo oscuro semitransparente */
+    background: rgba(0, 0, 0, 0.6);
 }
 
 .modal.is-active {
-    display: flex; /* Visible cuando tiene la clase `is-active` */
+    display: flex;
 }
 
-  #focusPointDialog {
+#focusPointDialog {
     display: none;
     position: fixed;
     top: 50%;
@@ -163,30 +164,30 @@ body {
     border-radius: 8px;
     z-index: 2000;
     padding: 20px;
-  }
+}
 
-  #focusPointDialog header {
+#focusPointDialog header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 18px;
     font-weight: bold;
     margin-bottom: 10px;
-  }
+}
 
-  #focusPointDialog section {
+#focusPointDialog section {
     margin-bottom: 20px;
     color: #333;
     font-size: 14px;
-  }
+}
 
-  #focusPointDialog footer {
+#focusPointDialog footer {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-  }
+}
 
-  .modal-background {
+.modal-background {
     display: none;
     position: fixed;
     top: 0;
@@ -195,12 +196,12 @@ body {
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
-  }
+}
 
-  .modal-background.active,
-  #focusPointDialog.active {
+.modal-background.active,
+#focusPointDialog.active {
     display: block;
-  }
+}
 
 .modal-card {
     z-index: 1201;
@@ -260,7 +261,7 @@ body {
     justify-content: space-between;
 }
 
-/* Toolbar */
+
 #toolbarContainer {
     position: absolute;
     top: 10%;
@@ -270,7 +271,8 @@ body {
     padding: 10px;
     border-radius: 5px;
     display: none;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
 }
 
 #toolbar {
@@ -282,6 +284,7 @@ body {
     width: 40px;
     height: 40px;
     margin-bottom: 5px;
+    /* Esto añade espacio debajo de cada botón */
     background: none;
     border: none;
     cursor: pointer;
@@ -314,7 +317,8 @@ body {
     background: white;
     padding: 10px;
     border-radius: 5px;
-    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    z-index: 1200;
+    /* Ajustado para que esté sobre otros elementos */
     display: none;
 }
 
@@ -353,7 +357,8 @@ body.has-header #cesiumContainer {
 
 /* Print button */
 #printBtn {
-    z-index: 1200; /* Asegura que el ícono de impresión esté sobre los demás elementos */
+    z-index: 1200;
+    /* Asegura que el ícono de impresión esté sobre los demás elementos */
     cursor: pointer;
     font-size: 24px;
     background: rgba(42, 42, 42, 0.8);
@@ -413,7 +418,8 @@ body.has-header #cesiumContainer {
     background: white;
     padding: 10px;
     border-radius: 5px;
-    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    z-index: 1200;
+    /* Ajustado para que esté sobre otros elementos */
     display: none;
 }
 
@@ -426,12 +432,14 @@ body.has-header #cesiumContainer {
     background: white;
     padding: 10px;
     border-radius: 5px;
-    z-index: 1200; /* Ajustado para que esté sobre otros elementos */
+    z-index: 1200;
+    /* Ajustado para que esté sobre otros elementos */
     display: none;
 }
 
 /* Estilos para pantallas pequeñas */
 @media (max-width: 600px) {
+
     /* Ajustar el tamaño y la posición de la barra lateral */
     .sidebar-buttons {
         left: 10px !important;
@@ -500,17 +508,20 @@ body.has-header #cesiumContainer {
 #saveContainer {
     display: none;
     position: relative;
-    background: #4a4a4a; /* Fondo oscuro */
+    background: #4a4a4a;
+    /* Fondo oscuro */
     padding: 15px;
     border-radius: 5px;
-    color: white; /* Color del texto en blanco */
+    color: white;
+    /* Color del texto en blanco */
     z-index: 10;
     margin-top: 10px;
     width: 200px;
 }
 
 #saveContainer input {
-    margin-bottom: 10px; /* Espacio debajo del input */
+    margin-bottom: 10px;
+    /* Espacio debajo del input */
     width: 100%;
     padding: 5px;
     color: white;
@@ -533,8 +544,9 @@ body.has-header #cesiumContainer {
     background-color: rgba(80, 80, 80, 0.8);
 }
 
-#saveContainer button + button {
-    margin-left: 5px; /* Espacio entre botones */
+#saveContainer button+button {
+    margin-left: 5px;
+    /* Espacio entre botones */
 }
 
 /* Contenedor flex para cada capa */
@@ -542,27 +554,30 @@ body.has-header #cesiumContainer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 5px 5px; /* Espaciado vertical opcional */
-  }
-  
-  /* Contenedor para agrupar los botones de zoom y eliminar */
-  .buttons-group {
+    padding: 5px 5px;
+    /* Espaciado vertical opcional */
+}
+
+/* Contenedor para agrupar los botones de zoom y eliminar */
+.buttons-group {
     display: flex;
-    gap: 10px; /* Espacio entre los botones */
-  }
-  
-  /* Opcional: Ajustar el cursor al pasar el mouse sobre los iconos */
-  .layer-right i {
+    gap: 10px;
+    /* Espacio entre los botones */
+}
+
+/* Opcional: Ajustar el cursor al pasar el mouse sobre los iconos */
+.layer-right i {
     cursor: pointer;
-    font-size: 1.2em; /* Tamaño del icono, ajusta según necesidad */
-  }
-  
-  /* Opcional: Añadir un efecto hover para mejorar la interacción */
-  .layer-right i:hover {
+    font-size: 1.2em;
+    /* Tamaño del icono, ajusta según necesidad */
+}
+
+/* Opcional: Añadir un efecto hover para mejorar la interacción */
+.layer-right i:hover {
     opacity: 0.7;
-  }
-  
-  #skyboxWidget {
+}
+
+#skyboxWidget {
     position: absolute;
     top: 60px;
     right: 10px;
@@ -573,40 +588,133 @@ body.has-header #cesiumContainer {
     box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
     color: white;
     z-index: 1000;
-  }
-  
-  #skyboxWidget.hidden {
+}
+
+#skyboxWidget.hidden {
     display: none;
-  }
-  
-  .widget-header {
+}
+
+.widget-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
-  }
-  
-  .close-widget-btn {
+}
+
+.close-widget-btn {
     background: none;
     border: none;
     font-size: 18px;
     cursor: pointer;
     color: white;
-  }
-  
-  
-  .widget-content label,
-  .widget-content input,
-  .widget-content select,
-  .widget-content button {
+}
+
+
+.widget-content label,
+.widget-content input,
+.widget-content select,
+.widget-content button {
     margin-bottom: 10px;
     width: 100%;
+}
+
+
+.dropdown-container {
+    position: relative;
+    display: inline-block;
+    z-index: 10;
+    /* Asegura que el dropdown esté por encima */
+}
+
+.dropdown-content {
+    position: absolute;
+    top: 10%;
+    /* Posición debajo del trigger */
+    left: 7%;
+    /* Ajusta la posición horizontal para que coincida con la barra lateral */
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+    background-color: rgba(20, 20, 20, 0.95);
+    color: white;
+    z-index: 10000;
+    width: 350px;
+    display: none;
+    text-align: left;
+    max-height: 300px;
+    /* Establece una altura máxima (ajusta este valor según necesites) */
+    overflow-y: auto;
+    /* Habilita la barra de desplazamiento vertical cuando el contenido excede max-height */
+}
+
+.dropdown-content.show {
+    display: block;
+}
+
+.saved-view-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    margin: 2px 0;
+    background-color: rgba(30, 30, 30, 0.95);
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid white;
+    /* Añade un borde blanco de 1 píxel */
+}
+
+.saved-view-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.saved-view-item a {
+    color: white;
+    text-decoration: none;
+    flex-grow: 1;
+    margin-right: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.saved-view-item-icons {
+    display: flex;
+    align-items: center;
+}
+
+.default-icon,
+.delete-icon {
+    color: gray;
+    font-size: 1.2em;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: color 0.2s ease;
+}
+
+.default-icon.bx-star-fill,
+.delete-icon:hover,
+.default-icon:hover {
+    color: white;
+}
+
+#savedDrawingsList p,
+#savedDrawingsList div { /* Si los elementos son <p> o <div> */
+  margin-bottom: 10px; /* Ajusta este valor para más o menos espacio */
+}
+
+/* Si los elementos son directamente dentro del div sin etiqueta específica */
+#savedDrawingsList > * {
+  margin-bottom: 10px; /* Ajusta este valor para más o menos espacio */
+}
+
+#loadDrawingModal .modal-content {
+    width: auto; /* Adjust width to content */
+    max-width: 80%; /* Optional: Set a maximum width to prevent it from becoming too wide */
   }
   
-  
-
-
-
-
-
-
+  #loadDrawingModal .box {
+    width: auto; /* Ensure the box also adjusts */
+  }

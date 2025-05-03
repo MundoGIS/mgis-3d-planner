@@ -1,5 +1,5 @@
 let measureHandler;
-let measurePoints = [];
+let measurePoints =[];
 let measureWindow;
 let floatingMeasurePoint = null;
 let activeMeasureShape = null;
@@ -17,6 +17,9 @@ function createMeasurePoint(worldPosition) {
       outlineWidth: 2,
       heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
     },
+    properties: { // Añadir propiedad para identificar entidades de medición
+      isMeasurement: true
+    }
   });
 }
 
@@ -25,12 +28,16 @@ function drawMeasureShape(positionData) {
     polyline: {
       positions: positionData,
       clampToGround: true,
-      width: 4,
-      material: new Cesium.PolylineDashMaterialProperty({
-        color: Cesium.Color.BLACK,
-        dashPattern: 255,
+      width: 6, // Make the line a bit thicker
+      material: new Cesium.PolylineOutlineMaterialProperty({
+        color: Cesium.Color.WHITE, // White line
+        outlineWidth: 2,
+        outlineColor: Cesium.Color.BLACK, // Black outline
       }),
     },
+    properties: { // Añadir propiedad para identificar entidades de medición
+      isMeasurement: true
+    }
   });
 }
 
@@ -68,6 +75,14 @@ function createMeasureWindow() {
     buttonContainer.style.justifyContent = 'space-around';
     buttonContainer.style.marginBottom = '10px';
 
+    const verticalButton = document.createElement('i');
+    verticalButton.id = 'verticalMeasurementButton';
+    verticalButton.className = 'bx bx-up-arrow-alt'; // Elige el icono que prefieras
+    verticalButton.style.fontSize = '24px';
+    verticalButton.style.cursor = 'pointer';
+    verticalButton.onclick = () => setMeasureType('vertical');
+    buttonContainer.appendChild(verticalButton);
+
     const distanceButton = document.createElement('i');
     distanceButton.id = 'distanceMeasurementButton';
     distanceButton.className = 'bx bx-ruler';
@@ -83,6 +98,7 @@ function createMeasureWindow() {
     areaButton.style.cursor = 'pointer';
     areaButton.onclick = () => setMeasureType('area');
     buttonContainer.appendChild(areaButton);
+
 
     const clearButton = document.createElement('i');
     clearButton.id = 'clearMeasurementButton';
@@ -107,7 +123,7 @@ function createMeasureWindow() {
   }
 }
 
-function updateMeasureWindow(distance, totalDistance) {
+function updateMeasureWindow(distance, totalDistance, point1, point2) {
   createMeasureWindow();
   const measurementsList = document.getElementById('measurementsList');
   const totalDistanceElement = document.getElementById('totalDistance');
@@ -129,10 +145,30 @@ function updateMeasureWindow(distance, totalDistance) {
     measurementsList.appendChild(listItem);
 
     totalDistanceElement.innerText = `Total: ${totalDistanceDisplay}`;
+
+    // Crear etiqueta para mostrar la distancia del segmento
+    const midpoint = Cesium.Cartesian3.midpoint(point1, point2, new Cesium.Cartesian3());
+    cesiumViewer.entities.add({
+      position: midpoint,
+      label: {
+        text: distanceDisplay,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        font: '18px sans-serif', // Aumentar el tamaño de la fuente
+        fillColor: Cesium.Color.WHITE, // Texto blanco
+        outlineColor: Cesium.Color.BLACK, // Fondo negro (borde)
+        outlineWidth: 3, // Aumentar el grosor del borde para el fondo
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+      },
+      properties: { // Añadir propiedad para identificar entidades de medición
+        isMeasurement: true
+      }
+    });
   }
 }
 
-function updateAreaMeasureWindow(area) {
+function updateAreaMeasureWindow(area, points) {
   createMeasureWindow();
   const measurementsList = document.getElementById('measurementsList');
   const totalDistanceElement = document.getElementById('totalDistance');
@@ -152,6 +188,32 @@ function updateAreaMeasureWindow(area) {
     measurementsList.appendChild(listItem);
 
     totalDistanceElement.innerText = `Total: ${areaDisplay}`;
+
+    // Crear etiqueta para mostrar el área total (aproximación al centro)
+    if (points.length > 2) {
+      const centroid = turf.centroid(turf.polygon([points.map(p => {
+        const cartographic = Cesium.Cartographic.fromCartesian(p);
+        return [Cesium.Math.toDegrees(cartographic.longitude), Cesium.Math.toDegrees(cartographic.latitude)];
+      })]));
+      const centroidPosition = Cesium.Cartesian3.fromDegrees(centroid.geometry.coordinates[0], centroid.geometry.coordinates[1]);
+      cesiumViewer.entities.add({
+        position: centroidPosition,
+        label: {
+          text: areaDisplay,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          font: '20px sans-serif', // Aumentar el tamaño de la fuente
+          fillColor: Cesium.Color.WHITE, // Texto blanco
+          outlineColor: Cesium.Color.BLACK, // Fondo negro (borde)
+          outlineWidth: 3, // Aumentar el grosor del borde para el fondo
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        },
+        properties: { // Añadir propiedad para identificar entidades de medición
+          isMeasurement: true
+        }
+      });
+    }
   }
 }
 
@@ -198,47 +260,48 @@ function calculateMeasureArea(points) {
 }
 
 function startMeasureDistance() {
-  clearMeasurements(); 
+  clearMeasurements();
   let totalDistance = 0;
-  measurePoints = [];
+  measurePoints =[];
   isMeasuring = true;
 
   if (!measureHandler) {
     measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
   }
 
-  measureHandler.setInputAction(function(event) {
+  measureHandler.setInputAction(function (event) {
     const earthPosition = cesiumViewer.scene.pickPosition(event.position);
     if (Cesium.defined(earthPosition)) {
       measurePoints.push(earthPosition);
       createMeasurePoint(earthPosition);
 
       if (measurePoints.length > 1) {
-        const distance = calculateMeasureDistance(measurePoints[measurePoints.length - 2], earthPosition);
+        const previousPoint = measurePoints[measurePoints.length - 2];
+        const distance = calculateMeasureDistance(previousPoint, earthPosition);
         totalDistance += distance;
-        updateMeasureWindow(distance, totalDistance);
+        updateMeasureWindow(distance, totalDistance, previousPoint, earthPosition); // Pasar los puntos
         drawMeasureShape(measurePoints);
       }
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  measureHandler.setInputAction(function() {
+  measureHandler.setInputAction(function () {
     isMeasuring = false;
     console.log("Measurement finished. Total distance: " + totalDistance.toFixed(3) + " km");
   }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 }
 
 function startMeasureArea() {
-  clearMeasurements(); 
+  clearMeasurements();
   let totalArea = 0;
-  measurePoints = [];
+  measurePoints =[];
   isMeasuring = true;
 
   if (!measureHandler) {
     measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
   }
 
-  measureHandler.setInputAction(function(event) {
+  measureHandler.setInputAction(function (event) {
     const earthPosition = cesiumViewer.scene.pickPosition(event.position);
     if (Cesium.defined(earthPosition)) {
       measurePoints.push(earthPosition);
@@ -252,7 +315,7 @@ function startMeasureArea() {
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  measureHandler.setInputAction(function() {
+  measureHandler.setInputAction(function () {
     if (measurePoints.length > 2) {
       totalArea = calculateMeasureArea(measurePoints);
       updateAreaMeasureWindow(totalArea);
@@ -263,7 +326,13 @@ function startMeasureArea() {
 }
 
 function clearMeasurements() {
-  cesiumViewer.entities.removeAll();
+  const entitiesToRemove =[];
+  cesiumViewer.entities.values.forEach(entity => {
+    if (entity.properties && entity.properties.isMeasurement) {
+      entitiesToRemove.push(entity);
+    }
+  });
+  entitiesToRemove.forEach(entity => cesiumViewer.entities.remove(entity));
 }
 
 function clearMeasureData() {
@@ -271,7 +340,7 @@ function clearMeasureData() {
     document.getElementById('measurementsList').innerHTML = '';
     document.getElementById('totalDistance').innerText = 'Total: 0';
   }
-  measurePoints = [];
+  measurePoints =[];
   floatingMeasurePoint = null;
   activeMeasureShape = null;
   if (isMeasuring) {
@@ -313,18 +382,26 @@ function toggleMeasurement() {
 function updateMeasureButtonState() {
   const distanceButton = document.getElementById('distanceMeasurementButton');
   const areaButton = document.getElementById('areaMeasurementButton');
-  if (distanceButton && areaButton) {
+  const verticalButton = document.getElementById('verticalMeasurementButton');
+  if (distanceButton && areaButton && verticalButton) {
     if (isMeasuring) {
       if (measureType === 'distance') {
         distanceButton.style.backgroundColor = 'green';
         areaButton.style.backgroundColor = '';
+        verticalButton.style.backgroundColor = '';
       } else if (measureType === 'area') {
         distanceButton.style.backgroundColor = '';
         areaButton.style.backgroundColor = 'green';
+        verticalButton.style.backgroundColor = '';
+      } else if (measureType === 'vertical') {
+        distanceButton.style.backgroundColor = '';
+        areaButton.style.backgroundColor = '';
+        verticalButton.style.backgroundColor = 'green';
       }
     } else {
       distanceButton.style.backgroundColor = '';
       areaButton.style.backgroundColor = '';
+      verticalButton.style.backgroundColor = '';
     }
   }
 }
@@ -337,6 +414,8 @@ function setMeasureType(type) {
     startMeasureDistance();
   } else if (type === 'area') {
     startMeasureArea();
+  } else if (type === 'vertical') {
+    startMeasureVertical();
   }
   updateMeasureButtonState();
 }
@@ -356,7 +435,7 @@ function disableDoubleClickZoom() {
 }
 
 function enableDoubleClickZoom() {
-  cesiumViewer.screenSpaceEventHandler.setInputAction(function(click) {
+  cesiumViewer.screenSpaceEventHandler.setInputAction(function (click) {
     cesiumViewer.camera.zoomIn();
   }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 }
@@ -364,7 +443,7 @@ function enableDoubleClickZoom() {
 function disableInfoBoxClick() {
   if (!measureInfoBoxHandler) {
     measureInfoBoxHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
-    measureInfoBoxHandler.setInputAction(function() {
+    measureInfoBoxHandler.setInputAction(function () {
       // Do nothing to disable the infoBox click action
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   }
@@ -377,5 +456,120 @@ function enableInfoBoxClick() {
   }
 }
 
-// Inicialmente deshabilitamos la funcionalidad de medición
-closeMeasureWindow();
+
+function startMeasureVertical() {
+  clearMeasurements();
+  measurePoints =[];
+  isMeasuring = true;
+  let startPosition = null;
+  let verticalLineEntity = null;
+  let measureLabelEntity = null;
+
+  if (!measureHandler) {
+    measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
+  }
+
+  measureHandler.setInputAction(function (event) {
+    if (!startPosition) {
+      const pickedObject = cesiumViewer.scene.pick(event.position);
+      if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.position)) {
+        startPosition = pickedObject.position;
+        // Or pick the terrain intersection
+        // const ray = cesiumViewer.camera.getPickRay(event.position);
+        // startPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
+
+        if (startPosition) {
+          measurePoints.push(startPosition);
+          createMeasurePoint(startPosition);
+          // Start tracking mouse movement
+        }
+      } else {
+        const ray = cesiumViewer.camera.getPickRay(event.position);
+        startPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
+        if (startPosition) {
+          measurePoints.push(startPosition);
+          createMeasurePoint(startPosition);
+        }
+      }
+    } else {
+      // Measurement finished on second click
+      isMeasuring = false;
+      measureHandler.destroy();
+      measureHandler = null;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  measureHandler.setInputAction(function (movement) {
+    if (startPosition && isMeasuring) {
+      const ray = cesiumViewer.camera.getPickRay(movement.endPosition);
+      const endPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
+
+      if (Cesium.defined(endPosition)) {
+        const startCartographic = Cesium.Cartographic.fromCartesian(startPosition);
+        const endCartographic = Cesium.Cartographic.fromCartesian(endPosition);
+
+        // Approximate vertical distance (height difference)
+        const verticalDistance = Math.abs(endCartographic.height - startCartographic.height);
+        const distanceDisplay = verticalDistance.toFixed(2) + ' m';
+
+        const verticalEndPosition = Cesium.Cartesian3.fromRadians(
+          startCartographic.longitude,
+          startCartographic.latitude,
+          endCartographic.height // Use the height from the mouse position
+        );
+
+        const positions = [startPosition, verticalEndPosition];
+
+        if (!verticalLineEntity) {
+          verticalLineEntity = cesiumViewer.entities.add({
+            polyline: {
+              positions: positions,
+              material: Cesium.Color.WHITE,
+              width: 2,
+              clampToGround: false // Important for vertical lines
+            },
+            properties: { // Añadir propiedad para identificar entidades de medición
+              isMeasurement: true
+            }
+          });
+        } else {
+          verticalLineEntity.polyline.positions = new Cesium.CallbackProperty(function () {
+            return positions;
+          }, false);
+        }
+
+        // Update or create label
+        const labelPosition = verticalEndPosition; // Position label at the end
+        if (!measureLabelEntity) {
+          measureLabelEntity = cesiumViewer.entities.add({
+            position: labelPosition,
+            label: {
+              text: distanceDisplay,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              font: '14px sans-serif',
+              fillColor: Cesium.Color.YELLOW,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND // Or NONE
+            },
+            properties: { // Añadir propiedad para identificar entidades de medición
+              isMeasurement: true
+            }
+          });
+        } else {
+          measureLabelEntity.position = labelPosition;
+          measureLabelEntity.label.text = distanceDisplay;
+        }
+      }
+    }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+  // Optional: End measurement on right click
+  measureHandler.setInputAction(function () {
+    isMeasuring = false;
+    measureHandler.destroy();
+    measureHandler = null;
+  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+}
