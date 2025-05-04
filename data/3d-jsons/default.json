@@ -17,7 +17,7 @@
         "id": "96188",
         "url": "https://assets.cesium.com/96188/tileset.json",
         "key": 1739371602225,
-        "visible": false
+        "visible": true
       },
       {
         "name": "Googles",

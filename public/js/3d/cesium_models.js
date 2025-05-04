@@ -2,7 +2,7 @@ let cesiumViewer;
 
 // Ajustes de extensiones por tipo
 const acceptFormats = {
-  '2d': ['.jpeg', '.jpg', '.png', '.geotif', '.tiff'],
+  /* '2d': ['.jpeg', '.jpg', '.png', '.geotif', '.tiff'], */
   '3d': ['.gltf', '.glb', '.czml', '.kml', '.kmz'],
   '3Dtiles': ['.zip'],
   'terrain': ['.zip']
@@ -1272,11 +1272,11 @@ terrainSelect.addEventListener('change', async function () {
     }
 
     // ... dentro de addFileToList ...
-    if (file.type === '2d') {
+    /* if (file.type === '2d') {
       const viewImgButton = createButton('View', 'is-success');
       viewImgButton.onclick = () => viewImage(file.name);
       buttons.appendChild(viewImgButton);
-    }
+    } */
 
 
     if (file.type === '3Dtiles') {

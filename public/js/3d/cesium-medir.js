@@ -1,575 +1,791 @@
+// --- Global Variables ---
 let measureHandler;
-let measurePoints =[];
+let measurePoints = [];       // Stores Cartesian3 points for the CURRENT measurement being created
+let measurePrimitives = [];   // Stores references to ALL finished GroundPolylinePrimitives
+let measureEntities = [];     // Stores references to ALL finished Entities (points, labels, vertical lines)
 let measureWindow;
-let floatingMeasurePoint = null;
-let activeMeasureShape = null;
-let isMeasuring = false;
-let measureType = 'distance';
-let measureInfoBoxHandler = null;
+let floatingMeasurePoint = null; // Temporary entity for the red point under the cursor
+let activeMeasureShape = null; // Holds the dynamically updated shape (Primitive or Entity) during measurement creation
+let isMeasuring = false;      // Flag indicating if clicks should add points/finish
+let measureType = 'distance'; // Current measurement type ('distance', 'area', 'vertical')
+let originalCesiumSelectedEntityDescriptor = null; // For InfoBox override
 
+// --- Entity Creation (Points) ---
+// Does NOT add to measureEntities automatically anymore.
 function createMeasurePoint(worldPosition) {
-  return cesiumViewer.entities.add({
-    position: worldPosition,
-    point: {
-      pixelSize: 10,
-      color: Cesium.Color.TRANSPARENT,
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2,
-      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-    },
-    properties: { // Añadir propiedad para identificar entidades de medición
-      isMeasurement: true
-    }
-  });
-}
-
-function drawMeasureShape(positionData) {
-  return cesiumViewer.entities.add({
-    polyline: {
-      positions: positionData,
-      clampToGround: true,
-      width: 6, // Make the line a bit thicker
-      material: new Cesium.PolylineOutlineMaterialProperty({
-        color: Cesium.Color.WHITE, // White line
-        outlineWidth: 2,
-        outlineColor: Cesium.Color.BLACK, // Black outline
-      }),
-    },
-    properties: { // Añadir propiedad para identificar entidades de medición
-      isMeasurement: true
-    }
-  });
-}
-
-function createMeasureWindow() {
-  if (!measureWindow) {
-    const container = document.createElement('div');
-    container.id = 'measurementWindow';
-    container.style.position = 'absolute';
-    container.style.bottom = '10px';
-    container.style.right = '40%';
-    container.style.padding = '10px';
-    container.style.background = 'rgba(0, 0, 0, 0.75)';
-    container.style.color = 'white';
-    container.style.zIndex = '1000';
-    container.style.width = '200px';
-    container.style.borderRadius = '5px';
-    container.style.overflowY = 'auto';
-    container.style.maxHeight = '200px';
-
-    const closeButton = document.createElement('div');
-    closeButton.innerText = '×';
-    closeButton.style.float = 'right';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.color = 'white';
-    closeButton.style.fontSize = '20px';
-    closeButton.onclick = closeMeasureWindow;
-    container.appendChild(closeButton);
-
-    const title = document.createElement('h3');
-    title.innerText = 'Measurements';
-    container.appendChild(title);
-
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.justifyContent = 'space-around';
-    buttonContainer.style.marginBottom = '10px';
-
-    const verticalButton = document.createElement('i');
-    verticalButton.id = 'verticalMeasurementButton';
-    verticalButton.className = 'bx bx-up-arrow-alt'; // Elige el icono que prefieras
-    verticalButton.style.fontSize = '24px';
-    verticalButton.style.cursor = 'pointer';
-    verticalButton.onclick = () => setMeasureType('vertical');
-    buttonContainer.appendChild(verticalButton);
-
-    const distanceButton = document.createElement('i');
-    distanceButton.id = 'distanceMeasurementButton';
-    distanceButton.className = 'bx bx-ruler';
-    distanceButton.style.fontSize = '24px';
-    distanceButton.style.cursor = 'pointer';
-    distanceButton.onclick = () => setMeasureType('distance');
-    buttonContainer.appendChild(distanceButton);
-
-    const areaButton = document.createElement('i');
-    areaButton.id = 'areaMeasurementButton';
-    areaButton.className = 'bx bx-shape-polygon';
-    areaButton.style.fontSize = '24px';
-    areaButton.style.cursor = 'pointer';
-    areaButton.onclick = () => setMeasureType('area');
-    buttonContainer.appendChild(areaButton);
-
-
-    const clearButton = document.createElement('i');
-    clearButton.id = 'clearMeasurementButton';
-    clearButton.className = 'bx bx-trash';
-    clearButton.style.fontSize = '24px';
-    clearButton.style.cursor = 'pointer';
-    clearButton.onclick = clearMeasureData;
-    buttonContainer.appendChild(clearButton);
-
-    container.appendChild(buttonContainer);
-
-    const totalDistance = document.createElement('p');
-    totalDistance.id = 'totalDistance';
-    container.appendChild(totalDistance);
-
-    const measurementsList = document.createElement('ul');
-    measurementsList.id = 'measurementsList';
-    container.appendChild(measurementsList);
-
-    document.body.appendChild(container);
-    measureWindow = container;
-  }
-}
-
-function updateMeasureWindow(distance, totalDistance, point1, point2) {
-  createMeasureWindow();
-  const measurementsList = document.getElementById('measurementsList');
-  const totalDistanceElement = document.getElementById('totalDistance');
-
-  if (distance > 0) {
-    const cameraHeight = cesiumViewer.camera.positionCartographic.height;
-    let distanceDisplay, totalDistanceDisplay;
-
-    if (cameraHeight < 5000) {
-      distanceDisplay = `${(distance * 1000).toFixed(0)} m`;
-      totalDistanceDisplay = `${(totalDistance * 1000).toFixed(0)} m`;
-    } else {
-      distanceDisplay = `${distance.toFixed(3)} km`;
-      totalDistanceDisplay = `${totalDistance.toFixed(3)} km`;
-    }
-
-    const listItem = document.createElement('li');
-    listItem.innerText = distanceDisplay;
-    measurementsList.appendChild(listItem);
-
-    totalDistanceElement.innerText = `Total: ${totalDistanceDisplay}`;
-
-    // Crear etiqueta para mostrar la distancia del segmento
-    const midpoint = Cesium.Cartesian3.midpoint(point1, point2, new Cesium.Cartesian3());
-    cesiumViewer.entities.add({
-      position: midpoint,
-      label: {
-        text: distanceDisplay,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        font: '18px sans-serif', // Aumentar el tamaño de la fuente
-        fillColor: Cesium.Color.WHITE, // Texto blanco
-        outlineColor: Cesium.Color.BLACK, // Fondo negro (borde)
-        outlineWidth: 3, // Aumentar el grosor del borde para el fondo
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
-      },
-      properties: { // Añadir propiedad para identificar entidades de medición
-        isMeasurement: true
-      }
-    });
-  }
-}
-
-function updateAreaMeasureWindow(area, points) {
-  createMeasureWindow();
-  const measurementsList = document.getElementById('measurementsList');
-  const totalDistanceElement = document.getElementById('totalDistance');
-
-  if (area > 0) {
-    const cameraHeight = cesiumViewer.camera.positionCartographic.height;
-    let areaDisplay;
-
-    if (cameraHeight < 5000) {
-      areaDisplay = `${(area * 1000000).toFixed(0)} m²`;
-    } else {
-      areaDisplay = `${area.toFixed(3)} km²`;
-    }
-
-    const listItem = document.createElement('li');
-    listItem.innerText = areaDisplay;
-    measurementsList.appendChild(listItem);
-
-    totalDistanceElement.innerText = `Total: ${areaDisplay}`;
-
-    // Crear etiqueta para mostrar el área total (aproximación al centro)
-    if (points.length > 2) {
-      const centroid = turf.centroid(turf.polygon([points.map(p => {
-        const cartographic = Cesium.Cartographic.fromCartesian(p);
-        return [Cesium.Math.toDegrees(cartographic.longitude), Cesium.Math.toDegrees(cartographic.latitude)];
-      })]));
-      const centroidPosition = Cesium.Cartesian3.fromDegrees(centroid.geometry.coordinates[0], centroid.geometry.coordinates[1]);
-      cesiumViewer.entities.add({
-        position: centroidPosition,
-        label: {
-          text: areaDisplay,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          font: '20px sans-serif', // Aumentar el tamaño de la fuente
-          fillColor: Cesium.Color.WHITE, // Texto blanco
-          outlineColor: Cesium.Color.BLACK, // Fondo negro (borde)
-          outlineWidth: 3, // Aumentar el grosor del borde para el fondo
-          verticalOrigin: Cesium.VerticalOrigin.CENTER,
-          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+    const pointEntity = cesiumViewer.entities.add({
+        position: worldPosition,
+        point: {
+            pixelSize: 8, color: Cesium.Color.YELLOW,
+            outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+            heightReference: Cesium.HeightReference.NONE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
         },
-        properties: { // Añadir propiedad para identificar entidades de medición
-          isMeasurement: true
+        properties: { isMeasurement: true, type: 'point' }
+    });
+    // REMOVED: measureEntities.push(pointEntity);
+    return pointEntity;
+}
+
+// --- Ground Polyline Primitive Creation (Distance/Area Lines) ---
+// Does NOT add to measurePrimitives automatically anymore.
+function drawGroundMeasureShape(positions, loop = false) {
+    if (positions.length < 2) return null;
+    const groundPolylineGeometry = new Cesium.GroundPolylineGeometry({
+        positions: positions, width: 4, loop: loop
+    });
+    const groundPolylinePrimitive = new Cesium.GroundPolylinePrimitive({
+        geometryInstances: new Cesium.GeometryInstance({
+            geometry: groundPolylineGeometry,
+            attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.YELLOW) },
+            id: 'measureGroundPrimitive_' + Date.now()
+        }),
+        appearance: new Cesium.PolylineMaterialAppearance({
+            material: Cesium.Material.fromType('Color', { color: Cesium.Color.YELLOW })
+        }),
+        asynchronous: false
+    });
+    cesiumViewer.scene.primitives.add(groundPolylinePrimitive);
+    // REMOVED: measurePrimitives.push(groundPolylinePrimitive);
+    return groundPolylinePrimitive;
+}
+
+
+// --- Measurement Window UI ---
+function createMeasureWindow() {
+    if (!measureWindow) {
+        const container = document.createElement('div');
+        container.id = 'measurementWindow';
+        container.style.position = 'absolute';
+        container.style.bottom = '10px';
+        container.style.right = '40%';
+        container.style.padding = '10px';
+        container.style.background = 'rgba(0, 0, 0, 0.75)';
+        container.style.color = 'white';
+        container.style.zIndex = '1000';
+        container.style.width = '250px';
+        container.style.borderRadius = '5px';
+        container.style.overflowY = 'auto';
+        container.style.maxHeight = '250px';
+
+        const closeButton = document.createElement('div');
+        closeButton.innerText = '×';
+        closeButton.style.float = 'right';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.color = 'white';
+        closeButton.style.fontSize = '20px';
+        closeButton.onclick = closeMeasureWindow;
+        container.appendChild(closeButton);
+
+        const title = document.createElement('h3');
+        title.innerText = 'Measurements';
+        title.style.marginTop = '0px';
+        title.style.textAlign = 'center';
+        container.appendChild(title);
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'space-around';
+        buttonContainer.style.marginBottom = '10px';
+
+        function createButton(id, iconClass, type) {
+             const button = document.createElement('i');
+             button.id = id; button.className = iconClass; button.title = type.charAt(0).toUpperCase() + type.slice(1);
+             button.style.fontSize = '24px'; button.style.cursor = 'pointer'; button.style.padding = '5px';
+             button.onclick = () => setMeasureType(type);
+             buttonContainer.appendChild(button);
+             return button;
         }
-      });
+        createButton('verticalMeasurementButton', 'bx bx-up-arrow-alt', 'vertical');
+        createButton('distanceMeasurementButton', 'bx bx-ruler', 'distance');
+        createButton('areaMeasurementButton', 'bx bx-shape-polygon', 'area');
+
+        const clearButton = document.createElement('i');
+        clearButton.id = 'clearMeasurementButton'; clearButton.className = 'bx bx-trash';
+        clearButton.title = "Clear All Measurements"; clearButton.style.fontSize = '24px';
+        clearButton.style.cursor = 'pointer'; clearButton.style.padding = '5px'; clearButton.style.color = '#FF7F7F';
+        clearButton.onclick = clearAllMeasurementsAndData; // Call clear all
+        buttonContainer.appendChild(clearButton);
+        container.appendChild(buttonContainer);
+
+        const currentMeasureDisplay = document.createElement('p');
+        currentMeasureDisplay.id = 'currentMeasureDisplay';
+        currentMeasureDisplay.style.textAlign = 'center'; currentMeasureDisplay.style.fontWeight = 'bold';
+        currentMeasureDisplay.style.minHeight = '1.2em';
+        container.appendChild(currentMeasureDisplay);
+
+        const measurementsList = document.createElement('ul');
+        measurementsList.id = 'measurementsList';
+        measurementsList.style.listStyle = 'none'; measurementsList.style.padding = '0'; measurementsList.style.margin = '0';
+        container.appendChild(measurementsList);
+
+        document.body.appendChild(container);
+        measureWindow = container;
     }
-  }
+    updateMeasureButtonState();
 }
 
+// --- Update Measurement Display ---
+// Creates temporary segment labels for distance
+function updateMeasureWindowForDistance(segmentDistance, totalDistance, startPoint, endPoint) {
+    if (!measureWindow) createMeasureWindow();
+    const currentMeasureDisplay = document.getElementById('currentMeasureDisplay');
+    if (!currentMeasureDisplay) return;
+
+    const cameraHeight = cesiumViewer.camera.positionCartographic.height;
+    const useMeters = cameraHeight < 5000;
+    const segmentDisplay = useMeters ? `${(segmentDistance * 1000).toFixed(0)} m` : `${segmentDistance.toFixed(3)} km`;
+    const totalDisplay = useMeters ? `${(totalDistance * 1000).toFixed(0)} m` : `${totalDistance.toFixed(3)} km`;
+
+    currentMeasureDisplay.innerText = `Total: ${totalDisplay}`; // Show running total
+
+    // --- Segment Label Entity (Temporary) ---
+    const midpoint = Cesium.Cartesian3.midpoint(startPoint, endPoint, new Cesium.Cartesian3());
+    const labelEntity = cesiumViewer.entities.add({
+        position: midpoint,
+        label: {
+            text: segmentDisplay, style: Cesium.LabelStyle.FILL_AND_OUTLINE, font: '14px sans-serif',
+            fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM, horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            pixelOffset: new Cesium.Cartesian2(0, -5), heightReference: Cesium.HeightReference.NONE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        properties: { isMeasurement: true, type: 'temp_label' } // Mark as temporary
+    });
+    // Don't add temp label to measureEntities here, handle cleanup separately if needed,
+    // but clearMeasurements should catch it via the 'isMeasurement' property anyway.
+}
+
+// Updates list and creates final area label
+function updateMeasureWindowForArea(area, points) {
+    if (!measureWindow) createMeasureWindow();
+    const measurementsList = document.getElementById('measurementsList');
+    const currentMeasureDisplay = document.getElementById('currentMeasureDisplay');
+    if (!measurementsList || !currentMeasureDisplay) return;
+
+    if (area > 0 && points.length > 2) {
+        const cameraHeight = cesiumViewer.camera.positionCartographic.height;
+        const useSqMeters = cameraHeight < 10000;
+        const areaDisplay = useSqMeters ? `${(area * 1000000).toFixed(0)} m²` : `${area.toFixed(3)} km²`;
+
+        const listItem = document.createElement('li');
+        listItem.innerText = `Area: ${areaDisplay}`; listItem.style.borderBottom = '1px solid #555'; listItem.style.padding = '2px 0';
+        measurementsList.appendChild(listItem); measurementsList.scrollTop = measurementsList.scrollHeight;
+        currentMeasureDisplay.innerText = `Area: ${areaDisplay}`;
+
+        if (typeof turf !== 'undefined') {
+            try {
+                // Calculate center and sample terrain height (as before)
+                const turfCoords = points.map(p => { const c = Cesium.Cartographic.fromCartesian(p); return [Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude)]; });
+                 if (turfCoords.length > 0 && (turfCoords[0][0] !== turfCoords[turfCoords.length - 1][0] || turfCoords[0][1] !== turfCoords[turfCoords.length - 1][1])) turfCoords.push([...turfCoords[0]]);
+                const turfPolygon = turf.polygon([turfCoords]); const centerOfMass = turf.centerOfMass(turfPolygon);
+                const centerCartographic = Cesium.Cartographic.fromDegrees(centerOfMass.geometry.coordinates[0], centerOfMass.geometry.coordinates[1]);
+
+                Cesium.sampleTerrainMostDetailed(cesiumViewer.terrainProvider, [centerCartographic])
+                    .then(([updatedCenterCartographic]) => {
+                        const height = updatedCenterCartographic?.height ?? 0;
+                        const labelPosition = Cesium.Cartesian3.fromRadians(centerCartographic.longitude, centerCartographic.latitude, height + 1.0);
+                        // Create FINAL area label entity
+                        const labelEntity = cesiumViewer.entities.add({
+                            position: labelPosition,
+                            label: {
+                                text: areaDisplay, style: Cesium.LabelStyle.FILL_AND_OUTLINE, font: '16px sans-serif',
+                                fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+                                verticalOrigin: Cesium.VerticalOrigin.BOTTOM, horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                                pixelOffset: new Cesium.Cartesian2(0, 5), heightReference: Cesium.HeightReference.NONE,
+                                disableDepthTestDistance: Number.POSITIVE_INFINITY
+                            },
+                            properties: { isMeasurement: true, type: 'area_label' } // Final Label
+                        });
+                        measureEntities.push(labelEntity); // <-- TRACK FINAL LABEL
+                        console.log("Area label created and tracked.");
+                    }).catch(error => { /* ... fallback ... */ });
+            } catch (error) { /* ... error handling ... */ }
+        } else { console.warn("Turf unavailable for area label."); }
+    } else { currentMeasureDisplay.innerText = 'Area: -'; }
+}
+
+// Updates list for final height measurement
+function updateMeasureWindowForHeight(height) {
+     if (!measureWindow) createMeasureWindow();
+     const measurementsList = document.getElementById('measurementsList');
+     const currentMeasureDisplay = document.getElementById('currentMeasureDisplay');
+     if (!measurementsList || !currentMeasureDisplay) return;
+     const heightDisplay = `${height.toFixed(2)} m`;
+     const listItem = document.createElement('li');
+     listItem.innerText = `Height: ${heightDisplay}`; listItem.style.borderBottom = '1px solid #555'; listItem.style.padding = '2px 0';
+     measurementsList.appendChild(listItem); measurementsList.scrollTop = measurementsList.scrollHeight;
+     currentMeasureDisplay.innerText = `Height: ${heightDisplay}`;
+}
+
+
+// --- Calculation Functions --- (No changes)
 function calculateMeasureDistance(point1, point2) {
-  if (typeof turf === 'undefined') {
-    console.error('turf is not defined');
-    return 0;
-  }
-
-  const cartographic1 = Cesium.Cartographic.fromCartesian(point1);
-  const cartographic2 = Cesium.Cartographic.fromCartesian(point2);
-
-  cartographic1.height = 0;
-  cartographic2.height = 0;
-
-  const longitude1 = Cesium.Math.toDegrees(cartographic1.longitude);
-  const latitude1 = Cesium.Math.toDegrees(cartographic1.latitude);
-  const longitude2 = Cesium.Math.toDegrees(cartographic2.longitude);
-  const latitude2 = Cesium.Math.toDegrees(cartographic2.latitude);
-
-  const turfPoint1 = turf.point([longitude1, latitude1]);
-  const turfPoint2 = turf.point([longitude2, latitude2]);
-
-  const options = { units: 'kilometers' };
-  return turf.distance(turfPoint1, turfPoint2, options);
+    const distanceInMeters = Cesium.Cartesian3.distance(point1, point2);
+    return distanceInMeters / 1000; // Km
 }
-
 function calculateMeasureArea(points) {
-  if (typeof turf === 'undefined') {
-    console.error('turf is not defined');
-    return 0;
-  }
-
-  const turfPoints = points.map((point) => {
-    const cartographic = Cesium.Cartographic.fromCartesian(point);
-    return [Cesium.Math.toDegrees(cartographic.longitude), Cesium.Math.toDegrees(cartographic.latitude)];
-  });
-  if (turfPoints.length > 2) {
-    turfPoints.push(turfPoints[0]); // Ensure the first and last points are the same
-    const polygon = turf.polygon([turfPoints]);
-    return turf.area(polygon) / 1000000; // Returns area in square kilometers
-  }
-  return 0;
+    if (typeof turf === 'undefined') { console.error('turf is not defined'); return 0; }
+    const turfPoints = points.map(p => { const c=Cesium.Cartographic.fromCartesian(p); return [Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude)]; });
+    if (turfPoints.length > 2) {
+         if (turfPoints.length > 0 && (turfPoints[0][0] !== turfPoints[turfPoints.length - 1][0] || turfPoints[0][1] !== turfPoints[turfPoints.length - 1][1])) turfPoints.push([...turfPoints[0]]);
+        try { const poly = turf.polygon([turfPoints]); const areaM2 = turf.area(poly); return areaM2 / 1000000; } // Sq Km
+        catch (e) { console.error("Error calculating area:", e); return 0; }
+    } return 0;
 }
+
+// --- Measurement Start Functions ---
 
 function startMeasureDistance() {
-  clearMeasurements();
-  let totalDistance = 0;
-  measurePoints =[];
-  isMeasuring = true;
+    measurePoints = [];
+    let totalDistance = 0;
+    isMeasuring = true;
+    activeMeasureShape = null; // Temp primitive
+    let tempLabelEntities = []; // Store temp labels specific to this measurement
 
-  if (!measureHandler) {
-    measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
-  }
+    if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Click start point...';
+    if (!measureHandler) measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
+    else { measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK); }
 
-  measureHandler.setInputAction(function (event) {
-    const earthPosition = cesiumViewer.scene.pickPosition(event.position);
-    if (Cesium.defined(earthPosition)) {
-      measurePoints.push(earthPosition);
-      createMeasurePoint(earthPosition);
+    // --- Left Click ---
+    measureHandler.setInputAction(function (event) {
+        const pickedPosition = cesiumViewer.scene.pickPosition(event.position);
+        if (Cesium.defined(pickedPosition)) {
+            const startPoint = measurePoints.length > 0 ? measurePoints[measurePoints.length - 1] : null;
+            measurePoints.push(pickedPosition);
+            createMeasurePoint(pickedPosition); // Create visual point (but don't track yet)
 
-      if (measurePoints.length > 1) {
-        const previousPoint = measurePoints[measurePoints.length - 2];
-        const distance = calculateMeasureDistance(previousPoint, earthPosition);
-        totalDistance += distance;
-        updateMeasureWindow(distance, totalDistance, previousPoint, earthPosition); // Pasar los puntos
-        drawMeasureShape(measurePoints);
-      }
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+            if (startPoint) {
+                const segmentDistance = calculateMeasureDistance(startPoint, pickedPosition);
+                totalDistance += segmentDistance;
+                if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape); // Remove old temp line
+                activeMeasureShape = drawGroundMeasureShape(measurePoints); // Draw new temp line
+                updateMeasureWindowForDistance(segmentDistance, totalDistance, startPoint, pickedPosition); // Adds temp label
+                // Find the label just added and track it temporarily
+                 const lastLabel = cesiumViewer.entities.values.find(e => e.properties?.type === 'temp_label' && !tempLabelEntities.includes(e));
+                 if(lastLabel) tempLabelEntities.push(lastLabel);
+            } else {
+                 if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Click next point...';
+            }
+        }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  measureHandler.setInputAction(function () {
-    isMeasuring = false;
-    console.log("Measurement finished. Total distance: " + totalDistance.toFixed(3) + " km");
-  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    // --- Mouse Move ---
+    measureHandler.setInputAction(function (movement) {
+        if (measurePoints.length > 0 && isMeasuring) {
+            const currentMousePosition = cesiumViewer.scene.pickPosition(movement.endPosition);
+            if (Cesium.defined(currentMousePosition)) {
+                 if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape);
+                 activeMeasureShape = drawGroundMeasureShape(measurePoints.concat(currentMousePosition));
+                 if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint);
+                 floatingMeasurePoint = cesiumViewer.entities.add({position: currentMousePosition, point: { pixelSize: 5, color: Cesium.Color.RED }, properties: { isMeasurement: true, type: 'temp' }});
+            }
+        }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    // --- Right Click: Finalize ---
+    measureHandler.setInputAction(function () {
+        if (measurePoints.length > 1) {
+            isMeasuring = false;
+
+            // 1. Clean temp visuals
+            if (activeMeasureShape) { cesiumViewer.scene.primitives.remove(activeMeasureShape); activeMeasureShape = null; }
+            if (floatingMeasurePoint) { cesiumViewer.entities.remove(floatingMeasurePoint); floatingMeasurePoint = null; }
+            // Remove temp labels
+            tempLabelEntities.forEach(lbl => cesiumViewer.entities.remove(lbl));
+            tempLabelEntities = [];
+
+            // 2. Draw FINAL primitive and TRACK it
+            const finalPrimitive = drawGroundMeasureShape(measurePoints);
+            if (finalPrimitive) measurePrimitives.push(finalPrimitive);
+
+            // 3. TRACK final points
+            measurePoints.forEach(pos => {
+                 const finalPointEntity = createMeasurePoint(pos); // Create point visual again (or find existing?)
+                 measureEntities.push(finalPointEntity); // Track the final point entity
+            });
+
+            // 4. Add final result to list
+             const finalTotalDisplay = (totalDistance * 1000 < 5000) ? `${(totalDistance * 1000).toFixed(0)} m` : `${totalDistance.toFixed(3)} km`;
+             const list = document.getElementById('measurementsList');
+             const item = document.createElement('li');
+             item.innerText = `Distance: ${finalTotalDisplay}`; item.style.borderBottom = '1px solid #555'; item.style.padding = '2px 0';
+             list.appendChild(item); list.scrollTop = list.scrollHeight;
+             if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = `Finished: ${finalTotalDisplay}`;
+
+            // 5. Clean up ALL handlers for this measurement instance
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); // <-- Remove this too!
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+
+            measurePoints = []; // Clear points for next measurement
+            console.log("Distance measurement finished. Total:", finalTotalDisplay);
+
+        } else { /* ... cancel logic ... */
+             isMeasuring = false;
+             if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape);
+             if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint);
+             // Remove the single point entity if it exists
+             if (measurePoints.length === 1) {
+                 const entityToRemove = cesiumViewer.entities.values.find(e => e.properties?.type === 'point' && e.position?.getValue(cesiumViewer.clock.currentTime)?.equals(measurePoints[0]));
+                 if (entityToRemove) cesiumViewer.entities.remove(entityToRemove);
+             }
+             measurePoints = [];
+             measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+             measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+             measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+             if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Total: 0 km';
+        }
+        updateMeasureButtonState();
+    }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    updateMeasureButtonState();
 }
+
 
 function startMeasureArea() {
-  clearMeasurements();
-  let totalArea = 0;
-  measurePoints =[];
-  isMeasuring = true;
+    measurePoints = [];
+    isMeasuring = true;
+    activeMeasureShape = null; // Temp outline primitive
+    let pointEntitiesThisMeasure = []; // Track points just for this measure attempt
 
-  if (!measureHandler) {
-    measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
-  }
+    if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Click first point...';
+    if (!measureHandler) measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
+    else { measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK); }
 
-  measureHandler.setInputAction(function (event) {
-    const earthPosition = cesiumViewer.scene.pickPosition(event.position);
-    if (Cesium.defined(earthPosition)) {
-      measurePoints.push(earthPosition);
-      createMeasurePoint(earthPosition);
+    // --- Left Click ---
+    measureHandler.setInputAction(function (event) {
+        const pickedPosition = cesiumViewer.scene.pickPosition(event.position);
+        if (Cesium.defined(pickedPosition)) {
+            measurePoints.push(pickedPosition);
+            const pointEntity = createMeasurePoint(pickedPosition);
+            pointEntitiesThisMeasure.push(pointEntity); // Track points for this specific area
 
-      if (measurePoints.length > 2) {
-        drawMeasureShape(measurePoints.concat([measurePoints[0]]));
-      } else if (measurePoints.length > 1) {
-        drawMeasureShape(measurePoints);
-      }
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+            if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape);
+            if (measurePoints.length > 1) {
+                const loop = measurePoints.length > 2;
+                activeMeasureShape = drawGroundMeasureShape(measurePoints, loop);
+            }
+            if (measureWindow) {
+                 const pointText = measurePoints.length === 1 ? 'point' : 'points';
+                 document.getElementById('currentMeasureDisplay').innerText = `${measurePoints.length} ${pointText}. Right-click to finish.`;
+            }
+        }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-  measureHandler.setInputAction(function () {
-    if (measurePoints.length > 2) {
-      totalArea = calculateMeasureArea(measurePoints);
-      updateAreaMeasureWindow(totalArea);
-    }
-    isMeasuring = false;
-    console.log("Measurement finished. Total area: " + totalArea.toFixed(3) + " km²");
-  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    // --- Mouse Move ---
+    measureHandler.setInputAction(function (movement) {
+        if (measurePoints.length > 0 && isMeasuring) {
+            const currentMousePosition = cesiumViewer.scene.pickPosition(movement.endPosition);
+            if (Cesium.defined(currentMousePosition)) {
+                 if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape);
+                 const tempPositions = [...measurePoints, currentMousePosition];
+                 const loop = tempPositions.length > 2;
+                 activeMeasureShape = drawGroundMeasureShape(tempPositions, loop);
+                 if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint);
+                 floatingMeasurePoint = cesiumViewer.entities.add({position: currentMousePosition, point: { pixelSize: 5, color: Cesium.Color.RED }, properties: { isMeasurement: true, type: 'temp' }});
+            }
+        }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+    // --- Right Click: Finalize ---
+    measureHandler.setInputAction(function () {
+        if (measurePoints.length > 2) {
+            console.log("Area Measure: Right Click Received. Finalizing.");
+            isMeasuring = false;
+
+            // 1. Clean temp visuals
+            if (activeMeasureShape) { cesiumViewer.scene.primitives.remove(activeMeasureShape); activeMeasureShape = null; }
+            if (floatingMeasurePoint) { cesiumViewer.entities.remove(floatingMeasurePoint); floatingMeasurePoint = null; }
+
+            // 2. Draw FINAL outline and TRACK it
+            const finalOutlinePrimitive = drawGroundMeasureShape(measurePoints, true);
+            if(finalOutlinePrimitive) measurePrimitives.push(finalOutlinePrimitive);
+
+            // 3. Track the FINAL points created for this measure
+            pointEntitiesThisMeasure.forEach(pEnt => {
+                 if (!measureEntities.includes(pEnt)) measureEntities.push(pEnt);
+            });
+
+            // 4. Calculate area and update window/add FINAL label (label entity is tracked inside update func)
+            const totalArea = calculateMeasureArea(measurePoints);
+            updateMeasureWindowForArea(totalArea, measurePoints);
+
+            // 5. Clean up ALL handlers for this measurement instance
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); // <-- Remove this too!
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+
+            measurePoints = []; // <-- Clear points for next measurement
+            pointEntitiesThisMeasure = []; // Clear temp point tracker
+            console.log("Area measurement finished. Total area:", totalArea.toFixed(3), "km²");
+
+        } else {
+            console.log("Area Measure: Right Click - Not enough points. Cancelling.");
+            isMeasuring = false;
+            if (activeMeasureShape) cesiumViewer.scene.primitives.remove(activeMeasureShape);
+            if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint);
+            // Remove point entities created during this attempt
+            pointEntitiesThisMeasure.forEach(pEnt => cesiumViewer.entities.remove(pEnt));
+            pointEntitiesThisMeasure = [];
+            measurePoints = [];
+
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+            if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Area: 0 km²';
+        }
+        updateMeasureButtonState();
+    }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    updateMeasureButtonState();
 }
 
+
+// --- Vertical Measurement ---
+function startMeasureVertical() {
+    measurePoints = [];
+    let startPosition = null, startPositionCartographic = null;
+    let verticalLineEntity = null, measureLabelEntity = null; // TEMPORARY refs during creation
+    let startPointEntity = null, endPointEntity = null;       // TEMPORARY refs during creation
+    isMeasuring = true; let isDrawingLine = false;
+
+    if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Height: 0 m';
+    else { createMeasureWindow(); document.getElementById('currentMeasureDisplay').innerText = 'Height: 0 m'; }
+    console.log("Starting vertical measurement mode...");
+
+    if (!measureHandler) measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
+    else { measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE); measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK); }
+
+    // --- Left Click ---
+    measureHandler.setInputAction(function (event) {
+        console.log("Vertical Measure: Left Click. isDrawingLine:", isDrawingLine);
+        const pickedPosition = cesiumViewer.scene.pickPosition(event.position);
+        if (!Cesium.defined(pickedPosition)) { console.warn("Vertical Measure: Invalid click position."); return; }
+
+        if (!isDrawingLine) {
+            // --- First Click ---
+            startPosition = pickedPosition; startPositionCartographic = Cesium.Cartographic.fromCartesian(startPosition);
+            measurePoints = [startPosition];
+            startPointEntity = createMeasurePoint(startPosition); // Create visual start point
+            isDrawingLine = true; isMeasuring = true;
+            console.log("Vertical Measure: Start point set.");
+             if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Click end point...';
+            measureHandler.setInputAction(mouseMoveHandlerVertical, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            measureHandler.setInputAction(rightClickHandlerVerticalCancel, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+        } else {
+            // --- Second Click: Finish ---
+            console.log("Vertical Measure: Second click. Finalizing.");
+            isMeasuring = false; isDrawingLine = false;
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+            measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK); // <-- Remove this too!
+
+            const finalEndCartographic = Cesium.Cartographic.fromCartesian(pickedPosition);
+            const finalVerticalEndPosition = Cesium.Cartesian3.fromRadians( startPositionCartographic.longitude, startPositionCartographic.latitude, finalEndCartographic.height );
+            const finalVerticalDistance = Math.abs(finalEndCartographic.height - startPositionCartographic.height);
+            const finalDistanceDisplay = finalVerticalDistance.toFixed(2) + ' m';
+            console.log("Vertical Measure: Final distance:", finalDistanceDisplay);
+
+            // 1. Clean temp visuals
+            if (floatingMeasurePoint) { cesiumViewer.entities.remove(floatingMeasurePoint); floatingMeasurePoint = null; }
+             // Remove temporary line/label if they exist (they might be null if user clicked very fast)
+             if (verticalLineEntity && verticalLineEntity.properties?.type === 'temp_line') cesiumViewer.entities.remove(verticalLineEntity);
+             if (measureLabelEntity && measureLabelEntity.properties?.type === 'temp_label') cesiumViewer.entities.remove(measureLabelEntity);
+
+            // 2. Create FINAL visuals
+            const finalPositions = [startPosition, finalVerticalEndPosition];
+            const finalLabelPosition = finalVerticalEndPosition;
+
+            const finalLineEntity = cesiumViewer.entities.add({ // Create FINAL line
+                polyline: { positions: finalPositions, material: Cesium.Color.CYAN, width: 3, clampToGround: false },
+                properties: { isMeasurement: true, type: 'line' }
+            });
+            const finalLabelEntity = cesiumViewer.entities.add({ // Create FINAL label
+                position: finalLabelPosition,
+                label: { text: finalDistanceDisplay, style: Cesium.LabelStyle.FILL_AND_OUTLINE, font: '16px sans-serif', fillColor: Cesium.Color.CYAN, outlineColor: Cesium.Color.BLACK, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -5), heightReference: Cesium.HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+                properties: { isMeasurement: true, type: 'label' }
+            });
+            endPointEntity = createMeasurePoint(finalVerticalEndPosition); // Create FINAL end point
+
+            // 3. TRACK final entities
+            measureEntities.push(startPointEntity); // Track start point entity
+            measureEntities.push(endPointEntity);   // Track end point entity
+            measureEntities.push(finalLineEntity);  // Track final line
+            measureEntities.push(finalLabelEntity); // Track final label
+
+            // 4. Update UI list
+            updateMeasureWindowForHeight(finalVerticalDistance);
+
+            // 5. Reset state for NEXT measurement
+            measurePoints = []; // <-- Clear points array
+            startPosition = null; startPositionCartographic = null;
+            verticalLineEntity = null; measureLabelEntity = null; // Clear local refs
+            startPointEntity = null; endPointEntity = null;
+
+            updateMeasureButtonState();
+        }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    // --- Mouse Move Handler ---
+    function mouseMoveHandlerVertical(movement) {
+        if (!isDrawingLine || !startPosition) return;
+        const currentMousePosition = cesiumViewer.scene.pickPosition(movement.endPosition);
+        if (!Cesium.defined(currentMousePosition)) {
+             if (verticalLineEntity) verticalLineEntity.show = false; if (measureLabelEntity) measureLabelEntity.show = false; if (floatingMeasurePoint) floatingMeasurePoint.show = false;
+             return;
+        }
+        if (verticalLineEntity) verticalLineEntity.show = true; if (measureLabelEntity) measureLabelEntity.show = true; if (floatingMeasurePoint) floatingMeasurePoint.show = true;
+
+        const currentMouseCartographic = Cesium.Cartographic.fromCartesian(currentMousePosition); const currentHeight = currentMouseCartographic.height;
+        const verticalEndPosition = Cesium.Cartesian3.fromRadians(startPositionCartographic.longitude, startPositionCartographic.latitude, currentHeight);
+        const verticalDistance = Math.abs(currentHeight - startPositionCartographic.height); const distanceDisplay = verticalDistance.toFixed(2) + ' m';
+        const positions = [startPosition, verticalEndPosition]; const labelPosition = verticalEndPosition;
+
+        // Create/Update TEMP line (remove previous TEMP if exists)
+         if (verticalLineEntity && verticalLineEntity.properties?.type === 'temp_line') {
+             verticalLineEntity.polyline.positions = positions;
+         } else {
+             if(verticalLineEntity) cesiumViewer.entities.remove(verticalLineEntity); // Remove if it wasn't temp (shouldn't happen)
+             verticalLineEntity = cesiumViewer.entities.add({ polyline: { positions: positions, material: Cesium.Color.CYAN.withAlpha(0.7), width: 3, clampToGround: false }, properties: { isMeasurement: true, type: 'temp_line' } });
+         }
+        // Create/Update TEMP label
+         if (measureLabelEntity && measureLabelEntity.properties?.type === 'temp_label') {
+             measureLabelEntity.position = labelPosition; measureLabelEntity.label.text = distanceDisplay;
+         } else {
+             if(measureLabelEntity) cesiumViewer.entities.remove(measureLabelEntity); // Remove if it wasn't temp
+             measureLabelEntity = cesiumViewer.entities.add({ position: labelPosition, label: { text: distanceDisplay, /* styles */ style: Cesium.LabelStyle.FILL_AND_OUTLINE, font: '16px sans-serif', fillColor: Cesium.Color.CYAN.withAlpha(0.7), outlineColor: Cesium.Color.BLACK, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, horizontalOrigin: Cesium.HorizontalOrigin.CENTER, pixelOffset: new Cesium.Cartesian2(0, -5), heightReference: Cesium.HeightReference.NONE, disableDepthTestDistance: Number.POSITIVE_INFINITY }, properties: { isMeasurement: true, type: 'temp_label' } });
+         }
+        // Update Floating point
+        if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint);
+        floatingMeasurePoint = cesiumViewer.entities.add({ position: currentMousePosition, point: { pixelSize: 5, color: Cesium.Color.RED }, properties: { isMeasurement: true, type: 'temp' } });
+        // Update current display
+        if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = `Height: ${distanceDisplay}`;
+    }
+
+    // --- Right Click Cancel Handler ---
+    function rightClickHandlerVerticalCancel() {
+        console.log("Vertical Measure: Right Click Cancel.");
+        if (!isDrawingLine) return;
+        isMeasuring = false; isDrawingLine = false;
+
+        // Clean up visuals associated with THIS attempt
+        if (verticalLineEntity) cesiumViewer.entities.remove(verticalLineEntity); // Temp line
+        if (measureLabelEntity) cesiumViewer.entities.remove(measureLabelEntity); // Temp label
+        if (floatingMeasurePoint) cesiumViewer.entities.remove(floatingMeasurePoint); // Temp point
+        if (startPointEntity) cesiumViewer.entities.remove(startPointEntity); // The start point for this attempt
+
+        // Reset state
+        startPosition = null; startPositionCartographic = null;
+        verticalLineEntity = null; measureLabelEntity = null;
+        floatingMeasurePoint = null; startPointEntity = null; endPointEntity = null;
+        measurePoints = [];
+
+        // Remove listeners
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+        // LEFT_CLICK listener might still be active, remove it too for clean cancel
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+
+        if (measureWindow) document.getElementById('currentMeasureDisplay').innerText = 'Height: 0 m';
+        updateMeasureButtonState();
+    }
+    updateMeasureButtonState();
+    console.log("Vertical measurement mode ready. Click start point.");
+}
+
+
+// --- Cleanup and State Management ---
+
+// Clears ALL finished measurement visuals from the map (Entities and Primitives)
 function clearMeasurements() {
-  const entitiesToRemove =[];
-  cesiumViewer.entities.values.forEach(entity => {
-    if (entity.properties && entity.properties.isMeasurement) {
-      entitiesToRemove.push(entity);
-    }
+  console.log(`Attempting to clear tracked visuals: ${measureEntities.length} Entities, ${measurePrimitives.length} Primitives.`);
+
+  // --- 1. Clear Entities based on isMeasurement property ---
+  // (Using your preferred method which iterates all entities)
+  const entitiesToRemove = [];
+  try {
+      cesiumViewer.entities.values.forEach(entity => {
+          // Check for the property efficiently
+          if (entity?.properties?.isMeasurement?.getValue(cesiumViewer.clock.currentTime)) {
+               entitiesToRemove.push(entity);
+          }
+           // Safety check for floating point just in case it wasn't cleared
+           if (entity === floatingMeasurePoint) {
+                if (!entitiesToRemove.includes(entity)) {
+                     entitiesToRemove.push(entity);
+                }
+                floatingMeasurePoint = null; // Clear ref immediately
+           }
+      });
+
+      console.log(`Found ${entitiesToRemove.length} entities with isMeasurement property.`);
+      entitiesToRemove.forEach(entity => {
+          cesiumViewer.entities.remove(entity);
+      });
+       console.log("Finished removing entities by property.");
+
+  } catch (e) {
+       console.error("Error during entity removal by property:", e);
+  }
+   // Clear the entity tracking array as we removed based on property, not the array content
+   measureEntities = [];
+
+
+  // --- 2. Clear Primitives tracked in measurePrimitives array ---
+  let primitivesToRemove = [...measurePrimitives]; // Clone array
+  console.log(`Removing ${primitivesToRemove.length} tracked primitives.`);
+  primitivesToRemove.forEach(primitive => {
+      if (primitive && !primitive.isDestroyed()) {
+          try {
+              cesiumViewer.scene.primitives.remove(primitive);
+          } catch (e) {
+              console.warn("Error removing tracked primitive:", e, primitive?.geometryInstances?.id);
+          }
+      }
   });
-  entitiesToRemove.forEach(entity => cesiumViewer.entities.remove(entity));
+  measurePrimitives = []; // Clear the primitive tracking array
+
+  // --- 3. Reset temporary state ---
+  activeMeasureShape = null;
+  if (floatingMeasurePoint && cesiumViewer.entities.contains(floatingMeasurePoint)){
+       // Should have been caught above, but double check
+        cesiumViewer.entities.remove(floatingMeasurePoint);
+        floatingMeasurePoint = null;
+  }
+
+  console.log("Visual cleanup finished.");
 }
 
-function clearMeasureData() {
-  if (measureWindow) {
-    document.getElementById('measurementsList').innerHTML = '';
-    document.getElementById('totalDistance').innerText = 'Total: 0';
-  }
-  measurePoints =[];
-  floatingMeasurePoint = null;
-  activeMeasureShape = null;
-  if (isMeasuring) {
-    if (measureType === 'distance') {
-      startMeasureDistance();
-    } else if (measureType === 'area') {
-      startMeasureArea();
+// Clears all visuals AND data/UI - Called by Trash button
+function clearAllMeasurementsAndData() {
+    console.log("Clear All button clicked.");
+    clearMeasurements(); // Clear visuals
+    measurePoints = [];   // Clear points array from any current measurement
+
+    // Reset UI display completely
+    if (measureWindow) {
+        document.getElementById('measurementsList').innerHTML = '';
+        const display = document.getElementById('currentMeasureDisplay');
+        display.innerText = 'Cleared. Select type.'; // Default message
     }
-  }
+
+    // Stop any active measurement handlers
+    isMeasuring = false;
+    if (measureHandler) {
+         measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+         measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+         measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    }
+    measureType = ''; // Clear type
+    updateMeasureButtonState(); // Update buttons (none active)
 }
+
 
 function closeMeasureWindow() {
-  if (measureHandler) {
-    measureHandler.destroy();
-    measureHandler = null;
-  }
-  isMeasuring = false;
-  clearMeasurements();
-  clearMeasureData();
-  if (measureWindow) {
-    document.body.removeChild(measureWindow);
-    measureWindow = null;
-  }
-  updateMeasureButtonState();
+    if (measureHandler) {
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+        if (!measureHandler.isDestroyed()) measureHandler.destroy();
+        measureHandler = null;
+    }
+    isMeasuring = false;
+    clearMeasurements(); // Clear ALL visuals when closing window
+
+    if (measureWindow) {
+        document.body.removeChild(measureWindow);
+        measureWindow = null;
+    }
+    enableDoubleClickZoom();
+    enableInfoBoxPicking(); // Use new function
+    // updateMeasureButtonState is called implicitly by closing window (measureWindow becomes null)
 }
 
 function toggleMeasurement() {
-  if (isMeasuring) {
-    closeMeasureWindow();
-    enableDoubleClickZoom();
-    enableInfoBoxClick();
-  } else {
-    openMeasureWindow();
-    setMeasureType('distance');
-  }
-  updateMeasureButtonState();
+    if (measureWindow) closeMeasureWindow();
+    else openMeasureWindow();
 }
 
 function updateMeasureButtonState() {
-  const distanceButton = document.getElementById('distanceMeasurementButton');
-  const areaButton = document.getElementById('areaMeasurementButton');
-  const verticalButton = document.getElementById('verticalMeasurementButton');
-  if (distanceButton && areaButton && verticalButton) {
-    if (isMeasuring) {
-      if (measureType === 'distance') {
-        distanceButton.style.backgroundColor = 'green';
-        areaButton.style.backgroundColor = '';
-        verticalButton.style.backgroundColor = '';
-      } else if (measureType === 'area') {
-        distanceButton.style.backgroundColor = '';
-        areaButton.style.backgroundColor = 'green';
-        verticalButton.style.backgroundColor = '';
-      } else if (measureType === 'vertical') {
-        distanceButton.style.backgroundColor = '';
-        areaButton.style.backgroundColor = '';
-        verticalButton.style.backgroundColor = 'green';
-      }
-    } else {
-      distanceButton.style.backgroundColor = '';
-      areaButton.style.backgroundColor = '';
-      verticalButton.style.backgroundColor = '';
-    }
-  }
+    const activeColor = 'rgba(70, 130, 180, 0.8)';
+    const buttons = [ { id: 'distanceMeasurementButton', type: 'distance' }, { id: 'areaMeasurementButton', type: 'area' }, { id: 'verticalMeasurementButton', type: 'vertical' } ];
+    buttons.forEach(bInfo => {
+        const button = document.getElementById(bInfo.id);
+        if (button) {
+            if (measureWindow && measureType === bInfo.type) { button.style.backgroundColor = activeColor; button.style.borderRadius = '3px'; }
+            else { button.style.backgroundColor = ''; button.style.borderRadius = ''; }
+        }
+    });
 }
 
 function setMeasureType(type) {
-  measureType = type;
-  isMeasuring = false;
-  clearMeasureData();
-  if (type === 'distance') {
-    startMeasureDistance();
-  } else if (type === 'area') {
-    startMeasureArea();
-  } else if (type === 'vertical') {
-    startMeasureVertical();
-  }
-  updateMeasureButtonState();
+    if (!measureWindow) { // Should not happen if called from buttons, but safety check
+         openMeasureWindow(); // Open window if not already open
+    }
+
+    if (measureHandler) {
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+        measureHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    } else {
+        measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
+    }
+
+    measureType = type;
+    isMeasuring = false; // Reset flag for the new mode
+
+    // Reset the current measure display in the window
+     if (measureWindow) {
+         const display = document.getElementById('currentMeasureDisplay');
+         if (type === 'distance') display.innerText = 'Click start point...';
+         else if (type === 'area') display.innerText = 'Click first point...';
+         else if (type === 'vertical') display.innerText = 'Click start point...';
+     }
+
+    // Start the selected measurement logic
+    if (type === 'distance') startMeasureDistance();
+    else if (type === 'area') startMeasureArea();
+    else if (type === 'vertical') startMeasureVertical();
+    updateMeasureButtonState();
 }
 
 function openMeasureWindow() {
-  if (!isMeasuring) {
+    if (measureWindow) return;
     createMeasureWindow();
-    isMeasuring = true;
-    setMeasureType('distance');
     disableDoubleClickZoom();
-    disableInfoBoxClick();
-  }
+    disableInfoBoxPicking(); // Use new override method
+    setMeasureType('distance'); // Start with distance mode active
 }
 
+// --- Default Interaction Disabling/Enabling ---
 function disableDoubleClickZoom() {
-  cesiumViewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+    cesiumViewer.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 }
-
 function enableDoubleClickZoom() {
-  cesiumViewer.screenSpaceEventHandler.setInputAction(function (click) {
-    cesiumViewer.camera.zoomIn();
-  }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
-}
-
-function disableInfoBoxClick() {
-  if (!measureInfoBoxHandler) {
-    measureInfoBoxHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.scene.canvas);
-    measureInfoBoxHandler.setInputAction(function () {
-      // Do nothing to disable the infoBox click action
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-  }
-}
-
-function enableInfoBoxClick() {
-  if (measureInfoBoxHandler) {
-    measureInfoBoxHandler.destroy();
-    measureInfoBoxHandler = null;
-  }
-}
-
-
-function startMeasureVertical() {
-  clearMeasurements();
-  measurePoints =[];
-  isMeasuring = true;
-  let startPosition = null;
-  let verticalLineEntity = null;
-  let measureLabelEntity = null;
-
-  if (!measureHandler) {
-    measureHandler = new Cesium.ScreenSpaceEventHandler(cesiumViewer.canvas);
-  }
-
-  measureHandler.setInputAction(function (event) {
-    if (!startPosition) {
-      const pickedObject = cesiumViewer.scene.pick(event.position);
-      if (Cesium.defined(pickedObject) && Cesium.defined(pickedObject.position)) {
-        startPosition = pickedObject.position;
-        // Or pick the terrain intersection
-        // const ray = cesiumViewer.camera.getPickRay(event.position);
-        // startPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
-
-        if (startPosition) {
-          measurePoints.push(startPosition);
-          createMeasurePoint(startPosition);
-          // Start tracking mouse movement
-        }
-      } else {
-        const ray = cesiumViewer.camera.getPickRay(event.position);
-        startPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
-        if (startPosition) {
-          measurePoints.push(startPosition);
-          createMeasurePoint(startPosition);
-        }
-      }
-    } else {
-      // Measurement finished on second click
-      isMeasuring = false;
-      measureHandler.destroy();
-      measureHandler = null;
+    if (!measureWindow && !measureHandler) { // Only if tool fully closed
+         try { cesiumViewer.screenSpaceEventHandler.setInputAction(c => cesiumViewer.camera.zoomIn(), Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK); }
+         catch(e) { console.warn("Could not re-enable double click zoom:", e); }
     }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+}
 
-  measureHandler.setInputAction(function (movement) {
-    if (startPosition && isMeasuring) {
-      const ray = cesiumViewer.camera.getPickRay(movement.endPosition);
-      const endPosition = cesiumViewer.scene.globe.pick(ray, cesiumViewer.scene);
-
-      if (Cesium.defined(endPosition)) {
-        const startCartographic = Cesium.Cartographic.fromCartesian(startPosition);
-        const endCartographic = Cesium.Cartographic.fromCartesian(endPosition);
-
-        // Approximate vertical distance (height difference)
-        const verticalDistance = Math.abs(endCartographic.height - startCartographic.height);
-        const distanceDisplay = verticalDistance.toFixed(2) + ' m';
-
-        const verticalEndPosition = Cesium.Cartesian3.fromRadians(
-          startCartographic.longitude,
-          startCartographic.latitude,
-          endCartographic.height // Use the height from the mouse position
-        );
-
-        const positions = [startPosition, verticalEndPosition];
-
-        if (!verticalLineEntity) {
-          verticalLineEntity = cesiumViewer.entities.add({
-            polyline: {
-              positions: positions,
-              material: Cesium.Color.WHITE,
-              width: 2,
-              clampToGround: false // Important for vertical lines
-            },
-            properties: { // Añadir propiedad para identificar entidades de medición
-              isMeasurement: true
-            }
-          });
-        } else {
-          verticalLineEntity.polyline.positions = new Cesium.CallbackProperty(function () {
-            return positions;
-          }, false);
+// --- InfoBox Management (using selectedEntity override) ---
+function disableInfoBoxPicking() {
+    try {
+        if (!originalCesiumSelectedEntityDescriptor && Object.getOwnPropertyDescriptor(cesiumViewer, 'selectedEntity')) {
+             originalCesiumSelectedEntityDescriptor = Object.getOwnPropertyDescriptor(cesiumViewer, 'selectedEntity');
         }
-
-        // Update or create label
-        const labelPosition = verticalEndPosition; // Position label at the end
-        if (!measureLabelEntity) {
-          measureLabelEntity = cesiumViewer.entities.add({
-            position: labelPosition,
-            label: {
-              text: distanceDisplay,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              font: '14px sans-serif',
-              fillColor: Cesium.Color.YELLOW,
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
-              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND // Or NONE
-            },
-            properties: { // Añadir propiedad para identificar entidades de medición
-              isMeasurement: true
-            }
-          });
-        } else {
-          measureLabelEntity.position = labelPosition;
-          measureLabelEntity.label.text = distanceDisplay;
-        }
-      }
-    }
-  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-  // Optional: End measurement on right click
-  measureHandler.setInputAction(function () {
-    isMeasuring = false;
-    measureHandler.destroy();
-    measureHandler = null;
-  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+         Object.defineProperty(cesiumViewer, 'selectedEntity', { configurable: true, get: () => undefined, set: (v) => {} });
+          if(cesiumViewer.selectedEntityViewModel) cesiumViewer.selectedEntityViewModel.selectedEntity = undefined;
+         console.log("InfoBox Picking Disabled");
+    } catch (e) { console.error("Error disabling InfoBox:", e); }
+}
+function enableInfoBoxPicking() {
+     try {
+         if (originalCesiumSelectedEntityDescriptor) {
+             Object.defineProperty(cesiumViewer, 'selectedEntity', originalCesiumSelectedEntityDescriptor);
+             originalCesiumSelectedEntityDescriptor = null;
+             console.log("InfoBox Picking Enabled");
+         }
+     } catch(e) { console.error("Error enabling InfoBox:", e); }
 }

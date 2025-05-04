@@ -65,7 +65,7 @@ const assimpPath = path.join(__dirname, '..', 'public', 'Thirdparty', 'Assimp', 
 const tilesDir = path.join(__dirname, '..', 'data', 'uploaded', '3d', '3dtiles');
 const tredDir = path.join(__dirname, '..', 'data', 'uploaded', '3d');
 const terrainDir = path.join(__dirname, '..', 'data', 'uploaded', '3d', 'terrain');
-const twodDir = path.join(__dirname, '..', 'data', 'uploaded', '2d');
+//const twodDir = path.join(__dirname, '..', 'data', 'uploaded', '2d');
 
 router.use(express.json({ limit: '900mb' }));
 router.use(express.urlencoded({ limit: '900mb', extended: true }));
@@ -144,9 +144,9 @@ router.post('/api/files', async (req, res) => {
 
   // Verificar que req.paths tenga las rutas correctas
   if (
-    !req.paths || 
-    typeof req.paths !== 'object' || 
-    !req.paths['3dPath'] || 
+    !req.paths ||
+    typeof req.paths !== 'object' ||
+    !req.paths['3dPath'] ||
     !req.paths['3dtilesPath'] ||
     !req.paths['TerrainPath'] ||
     !req.paths['2dPath']
@@ -188,8 +188,8 @@ router.post('/api/files', async (req, res) => {
   }
 
   // Convertir a array por si suben un solo archivo
-  const files = Array.isArray(req.files.files) 
-    ? req.files.files 
+  const files = Array.isArray(req.files.files)
+    ? req.files.files
     : [req.files.files];
 
   const uploadedFiles = [];
@@ -201,8 +201,8 @@ router.post('/api/files', async (req, res) => {
 
     // 1) Revisar extensión
     if (!allowedFormats.includes(fileExtension)) {
-      unsupportedFiles.push({ 
-        name: file.name, 
+      unsupportedFiles.push({
+        name: file.name,
         error: 'File format not allowed.'
       });
       continue;
@@ -214,8 +214,8 @@ router.post('/api/files', async (req, res) => {
       console.log(`File moved to: ${filePath}`);
     } catch (err) {
       console.error(`Error moving file ${file.name}:`, err);
-      unsupportedFiles.push({ 
-        name: file.name, 
+      unsupportedFiles.push({
+        name: file.name,
         error: 'Error moving file.'
       });
       continue;
@@ -259,7 +259,7 @@ router.post('/api/files', async (req, res) => {
         if (requiredFileDir !== unzipDir) {
           // Mover el archivo .json al nivel superior
           const destinationRequiredFilePath = path.join(unzipDir, neededFile);
-          
+
           // Evitar mover si source == destination
           if (requiredFilePath !== destinationRequiredFilePath) {
             await moveFileOrDirectory(requiredFilePath, destinationRequiredFilePath);
@@ -389,17 +389,17 @@ router.get('/api/terrainExtent/:terrainName', (req, res) => {
 
 // Resto de las rutas (sin modificaciones)
 router.get('/geodata', (req, res) => {
-  const files2DPath = twodDir;
+  //const files2DPath = twodDir;
   const files3DPath = tredDir;
   const files3DtilesPath = tilesDir;
   const filesTerrainPath = terrainDir;
-  const folderNames2D = fs.readdirSync(files2DPath);
+  //const folderNames2D = fs.readdirSync(files2DPath);
   const folderNames3D = fs.readdirSync(files3DPath);
   const folderNames3Dtiles = fs.readdirSync(files3DtilesPath);
   const folderNamesTerrain = fs.readdirSync(filesTerrainPath);
 
   res.render('geodata', {
-    folderNames2D,
+    //folderNames2D,
     folderNames3D,
     folderNames3Dtiles,
     folderNamesTerrain,
@@ -411,13 +411,13 @@ router.get('/geodata', (req, res) => {
 
 router.get('/api/files', (req, res, next) => {
   try {
-    const files2D = [];
+    //const files2D = [];
     const files3D = [];
     const files3Dtiles = [];
     const filesTerrain = [];
 
     const paths = {
-      files2DPath: path.resolve(__dirname, '..', req.paths['2dPath']),
+      //files2DPath: path.resolve(__dirname, '..', req.paths['2dPath']),
       files3DPath: path.resolve(__dirname, '..', req.paths['3dPath']),
       files3DtilesPath: path.resolve(__dirname, '..', req.paths['3dtilesPath']),
       filesTerrainPath: path.resolve(__dirname, '..', req.paths['TerrainPath']),
@@ -436,14 +436,14 @@ router.get('/api/files', (req, res, next) => {
         // ==== 2D ====
         // Si quieres que .geojson y .kml vayan a 2D en lugar de 3D, podrías ajustarlo aquí.
         // Por ahora, asumo que 2D son tus shapefiles, tiffs, imágenes, etc.
-        if (stats.isFile() && key === 'files2DPath') {
+       /*  if (stats.isFile() && key === 'files2DPath') {
           files2D.push({ name: file, type: '2d' });
-        }
+        } */
 
         // ==== 3D ====
         // Agregamos las extensiones que quieres en la sección 3D:
         // .gltf, .glb (ya estaban), .kml, .kmz, .geojson, .czml
-        else if (
+        if (
           stats.isFile() &&
           key === 'files3DPath' &&
           (
@@ -484,7 +484,7 @@ router.get('/api/files', (req, res, next) => {
       });
     }
 
-    res.json({ files2D, files3D, files3Dtiles, filesTerrain });
+    res.json({ /* files2D,  */files3D, files3Dtiles, filesTerrain });
   } catch (err) {
     console.error('Error reading files:', err);
     res.status(500).json({ error: 'Error reading files.' });
@@ -523,9 +523,9 @@ router.get('/api/files/:fileName', (req, res) => {
     folderPath = req.paths['TerrainPath'];
   } else if (fileType === '3Dtiles') {
     folderPath = req.paths['3dtilesPath'];
-  } else {
+  } /* else {
     folderPath = req.paths['2dPath'];
-  }
+  } */
 
   const filePath = path.join(__dirname, '..', folderPath, req.params.fileName);
   res.sendFile(filePath);

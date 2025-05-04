@@ -82,8 +82,6 @@ function setupCesium() {
       // Establecer el color del globo a gris claro
     cesiumViewer.scene.globe.baseColor = Cesium.Color.LIGHTGRAY;
 
-
-
     function enableDragDrop() {
       if (cesiumViewer) {
         cesiumViewer.extend(Cesium.viewerDragDropMixin, {

@@ -878,38 +878,39 @@ router.post('/api/set-default-view', async (req, res) => {
 //save drawing
 
 router.post('/api/save-drawing', (req, res) => {
-  const { name, geojson } = req.body;
+  const { name, geojson } = req.body;
 
-  console.log('Datos recibidos para guardar:', { name, geojson });
+  console.log('Received data to save:', { name, geojson });
 
-  fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
-    if (err) {
-      console.error('Error al leer el archivo:', err);
-      return res.status(500).json({ success: false, message: 'Error al leer el archivo.' });
-    }
+  fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
+    if (err) {
+      console.error('Error reading the file:', err);
+      return res.status(500).json({ success: false, message: 'Error reading the file.' });
+    }
 
-    try {
-      const jsonData = JSON.parse(existingData);
+    try {
+      const jsonData = JSON.parse(existingData);
 
-      if (!jsonData.drawings) {
-        jsonData.drawings = {};
-      }
+      if (!jsonData.drawings) {
+        jsonData.drawings = {};
+      }
 
-      jsonData.drawings[name] = geojson;
+      jsonData.drawings[name] = geojson;
 
-      fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
-        if (err) {
-          console.error('Error al guardar el dibujo:', err);
-          return res.status(500).json({ success: false, message: 'Error al guardar el dibujo.' });
-        }
-        res.json({ success: true, message: 'Dibujo guardado exitosamente.' });
-      });
-    } catch (parseError) {
-      console.error('Error al parsear JSON:', parseError);
-      res.status(500).json({ success: false, message: 'Error al parsear JSON.' });
-    }
-  });
+      fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
+        if (err) {
+          console.error('Error saving the drawing:', err);
+          return res.status(500).json({ success: false, message: 'Error saving the drawing.' });
+        }
+        res.json({ success: true, message: 'Drawing saved successfully.' });
+      });
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      res.status(500).json({ success: false, message: 'Error parsing JSON.' });
+    }
+  });
 });
+
 
 router.get('/api/load-drawings', async (req, res) => {
   try {
@@ -927,7 +928,7 @@ router.get('/api/load-drawings', async (req, res) => {
                   if (jsonData.drawings && jsonData.drawings[drawingName]) {
                       return res.json({ geojson: jsonData.drawings[drawingName] });
                   } else {
-                      return res.status(404).json({ message: 'Dibujo no encontrado.' });
+                      return res.status(404).json({ message: 'Drawing not found.' });
                   }
               } else {
                   // Si no se proporciona un nombre, devolver la lista de nombres
@@ -935,50 +936,51 @@ router.get('/api/load-drawings', async (req, res) => {
                   return res.json({ drawings: drawingNames });
               }
           } catch (parseError) {
-              console.error('Error al parsear JSON:', parseError);
-              return res.status(500).json({ success: false, message: 'Error al parsear el archivo de dibujos JSON.' });
+              console.error('Error parsing JSON:', parseError);
+              return res.status(500).json({ success: false, message: 'Error parsing the JSON drawing file.' });
           }
       });
   } catch (error) {
       console.error('Error en la ruta /load-drawings:', error);
-      res.status(500).json({ message: 'Error al cargar la lista de dibujos.' });
+      res.status(500).json({ message: 'Error loading the drawing list.' });
   }
 });
 
 router.delete('/api/delete-drawing', (req, res) => {
-    const drawingName = req.query.name;
-  
-    if (!drawingName) {
-      return res.status(400).json({ success: false, message: 'Nombre del dibujo no proporcionado.' });
-    }
-  
-    fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
-      if (err) {
-        console.error('Error al leer el archivo:', err);
-        return res.status(500).json({ success: false, message: 'Error al leer el archivo.' });
-      }
-  
-      try {
-        const jsonData = JSON.parse(existingData);
-  
-        if (jsonData.drawings && jsonData.drawings.hasOwnProperty(drawingName)) {
-          delete jsonData.drawings[drawingName];
-  
-          fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
-            if (err) {
-              console.error('Error al guardar el archivo después de eliminar:', err);
-              return res.status(500).json({ success: false, message: 'Error al guardar el archivo.' });
-            }
-            res.json({ success: true, message: `Dibujo "${drawingName}" eliminado exitosamente.` });
-          });
-        } else {
-          return res.status(404).json({ success: false, message: `Dibujo "${drawingName}" no encontrado.` });
-        }
-      } catch (parseError) {
-        console.error('Error al parsear JSON:', parseError);
-        res.status(500).json({ success: false, message: 'Error al parsear JSON.' });
-      }
-    });
+  const drawingName = req.query.name;
+
+  if (!drawingName) {
+    return res.status(400).json({ success: false, message: 'Drawing name not provided.' });
+  }
+
+  fs.readFile(modelsFilePath, 'utf8', (err, existingData) => {
+    if (err) {
+      console.error('Error reading the file:', err);
+      return res.status(500).json({ success: false, message: 'Error reading the file.' });
+    }
+
+    try {
+      const jsonData = JSON.parse(existingData);
+
+      if (jsonData.drawings && jsonData.drawings.hasOwnProperty(drawingName)) {
+        delete jsonData.drawings[drawingName];
+
+        fs.writeFile(modelsFilePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
+          if (err) {
+            console.error('Error saving the file after deletion:', err);
+            return res.status(500).json({ success: false, message: 'Error saving the file.' });
+          }
+          res.json({ success: true, message: `Drawing "${drawingName}" deleted successfully.` });
+        });
+      } else {
+        return res.status(404).json({ success: false, message: `Drawing "${drawingName}" not found.` });
+      }
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      res.status(500).json({ success: false, message: 'Error parsing JSON.' });
+    }
   });
+});
+
 module.exports = router;
 

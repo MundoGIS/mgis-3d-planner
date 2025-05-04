@@ -227,17 +227,17 @@ function closeLoadDrawingModal() {
 // Función para cargar la lista de dibujos guardados desde el servidor
 async function loadDrawingList() {
   const savedDrawingsListDiv = document.getElementById('savedDrawingsList');
-  savedDrawingsListDiv.innerHTML = '<p>Cargando lista de dibujos...</p>';
+  savedDrawingsListDiv.innerHTML = '<p>Loading drawing list...</p>';
   try {
     const response = await fetch('/3d/api/load-drawings');
-    console.log('Respuesta del servidor:', response); // Añade esta línea
+    console.log('Server response:', response); // Added this line
     const data = await response.json();
-    console.log('Datos recibidos del servidor:', data); // Añade esta línea
+    console.log('Data received from server:', data); // Added this line
     if (data.drawings && data.drawings.length > 0) {
       savedDrawingsListDiv.innerHTML = '';
       const ul = document.createElement('ul');
       data.drawings.forEach(drawingName => {
-        console.log('Nombre del dibujo en el bucle:', drawingName); // Añade esta línea
+        console.log('Drawing name in loop:', drawingName); // Added this line
         const li = document.createElement('li');
 
         const loadButton = document.createElement('button');
@@ -248,7 +248,7 @@ async function loadDrawingList() {
         li.appendChild(loadButton);
 
         const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Eliminar';
+        deleteButton.textContent = 'Delete';
         deleteButton.classList.add('button', 'is-small', 'is-danger');
         deleteButton.style.marginBottom = '5px';
         deleteButton.style.marginLeft = '5px';
@@ -256,11 +256,11 @@ async function loadDrawingList() {
         li.appendChild(deleteButton);
 
         const downloadButton = document.createElement('button');
-        downloadButton.textContent = 'Descargar';
+        downloadButton.textContent = 'Download';
         downloadButton.classList.add('button', 'is-small', 'is-info');
         downloadButton.style.marginBottom = '5px';
         downloadButton.style.marginLeft = '5px';
-        downloadButton.onclick = () => downloadDrawing(drawingName); // Llama a la función de descarga
+        downloadButton.onclick = () => downloadDrawing(drawingName); // Calls the download function
         li.appendChild(downloadButton);
 
         const divButtons = document.createElement('div');
@@ -274,13 +274,14 @@ async function loadDrawingList() {
       });
       savedDrawingsListDiv.appendChild(ul);
     } else {
-      savedDrawingsListDiv.innerHTML = '<p>No se encontraron dibujos guardados.</p>';
+      savedDrawingsListDiv.innerHTML = '<p>No saved drawings found.</p>';
     }
   } catch (error) {
-    console.error('Error al cargar la lista de dibujos:', error);
-    savedDrawingsListDiv.innerHTML = '<p>Error al cargar la lista de dibujos.</p>';
+    console.error('Error loading the drawing list:', error);
+    savedDrawingsListDiv.innerHTML = '<p>Error loading the drawing list.</p>';
   }
 }
+
 
 // Función para descargar el dibujo como GeoJSON
 async function downloadDrawing(drawingName) {
@@ -299,13 +300,14 @@ async function downloadDrawing(drawingName) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } else {
-      alert('Error al obtener el dibujo para descargar.');
+      alert('Error retrieving the drawing for download.');
     }
   } catch (error) {
-    console.error('Error al descargar el dibujo:', error);
-    alert('Error al descargar el dibujo.');
+    console.error('Error downloading the drawing:', error);
+    alert('Error downloading the drawing.');
   }
 }
+
 
 // Función para confirmar la eliminación del dibujo
 function confirmDeleteDrawing(drawingName) {
@@ -337,20 +339,21 @@ async function deleteDrawing(drawingName) {
 // Función para cargar el dibujo seleccionado desde el servidor y añadirlo al mapa
 async function loadSelectedDrawing(drawingName) {
   try {
-    const response = await fetch(`/3d/api/load-drawings?name=${encodeURIComponent(drawingName)}`); // Reemplaza con la ruta correcta a tu API
+    const response = await fetch(`/3d/api/load-drawings?name=${encodeURIComponent(drawingName)}`);
     const data = await response.json();
     if (data && data.geojson && data.geojson.features) {
       addGeoJsonToMap(data.geojson);
       closeLoadDrawingModal();
-      alert(`Dibujo "${drawingName}" cargado.`);
+      alert(`Drawing "${drawingName}" loaded.`);
     } else {
-      alert('Error al cargar el dibujo seleccionado.');
+      alert('Error loading the selected drawing.');
     }
   } catch (error) {
-    console.error('Error al cargar el dibujo seleccionado:', error);
-    alert('Error al cargar el dibujo seleccionado.');
+    console.error('Error loading the selected drawing:', error);
+    alert('Error loading the selected drawing.');
   }
 }
+
 
 // Función para añadir features de GeoJSON al mapa de Cesium
 function addGeoJsonToMap(geojson) {
@@ -595,62 +598,64 @@ function toggleTool(tool) {
 
   if (dialogMap[tool]) {
     const dialogId = dialogMap[tool];
-    console.log(`[DEBUG] Mapeo encontrado. Dialog ID: ${dialogId}`); // <-- LOG
-
-    // Lógica específica ANTES de abrir el diálogo
+    console.log(`[DEBUG] Mapping found. Dialog ID: ${dialogId}`); // <-- LOG
+  
+    // Specific logic BEFORE opening the dialog
     if (tool === 'gltfModel') {
-      loadGltfModels(); // Carga modelos al abrir su diálogo
+      loadGltfModels(); // Load models when opening its dialog
     } else if (tool === 'point') {
-      // Llama a la función que actualiza la UI interna del diálogo de puntos
-      handlePointTypeChange(); // Muestra/oculta campos Icon/Standard
+      // Call the function that updates the internal UI of the point dialog
+      handlePointTypeChange(); // Show/hide Icon/Standard fields
       const pointType = document.querySelector('input[name="pointType"]:checked')?.value;
       if (pointType === 'icon') {
-        loadAvailableIcons(); // Carga iconos si el tipo icono está seleccionado
+        loadAvailableIcons(); // Load icons if the icon type is selected
       }
     }
-    // Abre el diálogo correspondiente
+    // Open the corresponding dialog
     openDialog(dialogId);
   } else {
-    console.warn(`[DEBUG] No hay diálogo mapeado para la herramienta: ${tool}`);
-    // Manejo de herramientas sin diálogo (como 'clear')
+    console.warn(`[DEBUG] No dialog mapped for the tool: ${tool}`);
+    // Handling tools without a dialog (like 'clear')
     if (tool === 'clear') {
       clearEntities();
-      activeTool = null; // 'clear' no permanece activo
-      // No necesitas llamar a deactivateTool aquí porque ya se hizo al principio
+      activeTool = null; // 'clear' does not remain active
+      // No need to call deactivateTool here because it was already done at the beginning
       return;
     }
-    // Si una herramienta debería tener diálogo pero no está en el map
-    console.error(`Tool ${tool} seleccionado pero no se encontró diálogo configurado.`);
-    activeTool = null; // No dejar la herramienta activa si falta configuración
+    // If a tool should have a dialog but is not in the map
+    console.error(`Tool ${tool} selected but no configured dialog was found.`);
+    activeTool = null; // Do not leave the tool active if configuration is missing
   }
 }
+  
 
 // Función para abrir un diálogo específico (modal o div)
 function openDialog(dialogId) {
-  console.log(`[DEBUG] openDialog llamado con ID: ${dialogId}`); // <-- LOG
-  closeAllDialogs(); // Cierra otros diálogos primero (BUENA PRÁCTICA)
+  console.log(`[DEBUG] openDialog called with ID: ${dialogId}`); // <-- LOG
+  closeAllDialogs(); // Close other dialogs first (GOOD PRACTICE)
   const dialog = document.getElementById(dialogId);
-  console.log(`[DEBUG] Buscando elemento con ID: ${dialogId}. Encontrado:`, dialog); // <-- LOG
+  console.log(`[DEBUG] Searching for element with ID: ${dialogId}. Found:`, dialog); // <-- LOG
 
   if (dialog) {
-    // Verifica si es un modal de Bulma
+    // Check if it's a Bulma modal
     if (dialog.classList.contains('modal')) {
       dialog.classList.add('is-active');
-      console.log(`[DEBUG] Añadida clase 'is-active' al modal. Clases actuales:`, dialog.classList); // <-- LOG
+      console.log(`[DEBUG] Added 'is-active' class to modal. Current classes:`, dialog.classList); // <-- LOG
     } else {
-      // Si no es modal, asume que es un div normal y usa display
+      // If not a modal, assume it's a normal div and use display
       dialog.style.display = 'block';
-      console.log(`[DEBUG] Establecido display='block' al div.`); // <-- LOG
+      console.log(`[DEBUG] Set display='block' to div.`); // <-- LOG
     }
-    console.log(`[DEBUG] Diálogo abierto: ${dialogId}`);
+    console.log(`[DEBUG] Dialog opened: ${dialogId}`);
   } else {
-    // ¡Este error es una causa muy probable si el diálogo no se abre!
-    console.error(`[DEBUG] ¡ERROR! Diálogo con ID "${dialogId}" no encontrado en el DOM.`); // <-- LOG
-    alert(`Error: No se encontró el panel de configuración para esta herramienta (${dialogId}).`); // Informa al usuario
-    // Podrías querer desactivar la herramienta si su diálogo no existe
-    // deactivateTool(); // Descomentar si es el comportamiento deseado
+    // This error is a very likely cause if the dialog doesn't open!
+    console.error(`[DEBUG] ERROR! Dialog with ID "${dialogId}" not found in the DOM.`); // <-- LOG
+    alert(`Error: Configuration panel for this tool (${dialogId}) not found.`); // Inform the user
+    // You might want to deactivate the tool if its dialog doesn't exist
+    // deactivateTool(); // Uncomment if this is the desired behavior
   }
 }
+
 
 // Nueva función para cerrar las herramientas de dibujo y desactivar la herramienta activa
 function closeDrawingTools() {
@@ -663,30 +668,31 @@ function closeDrawingTools() {
 
 // Función para desactivar la herramienta
 function deactivateTool() {
-  console.log("deactivateTool: Ejecutando..."); // <-- AÑADIR LOG
+  console.log("deactivateTool: Executing..."); // <-- ADD LOG
   if (activeTool) {
     document.getElementById(activeTool + 'Button')?.classList.remove('active');
   }
   activeTool = null;
-  console.log("deactivateTool: Handler antes de destruir:", handler); // <-- AÑADIR LOG
+  console.log("deactivateTool: Handler before destruction:", handler); // <-- ADD LOG
   if (handler) {
     handler.destroy();
     handler = null;
-    console.log("deactivateTool: Handler destruido."); // <-- AÑADIR LOG
+    console.log("deactivateTool: Handler destroyed."); // <-- ADD LOG
   } else {
-    console.log("deactivateTool: No había handler que destruir."); // <-- AÑADIR LOG
+    console.log("deactivateTool: No handler to destroy."); // <-- ADD LOG
   };
   activeShapePoints = [];
   activeShape = null;
   floatingPoint = null;
 
-  // Ocultar todos los diálogos de entrada
+  // Hide all input dialogs
   const dialogs = [
     'inputDialog', 'inputDialogModel', 'inputDialogLine', 'inputDialogPolygon',
     'inputDialogExtruded', 'inputDialogText', 'inputDialogRectangle', 'inputDialogCircle'
   ];
   dialogs.forEach(dialogId => document.getElementById(dialogId).style.display = 'none');
 }
+
 
 // Llamar `toggleTool` al hacer clic en los botones de la barra de herramientas
 const toolbar = document.getElementById('toolbar');
