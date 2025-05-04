@@ -1189,18 +1189,18 @@ terrainSelect.addEventListener('change', async function () {
     fetch('/data/api/files')
       .then(response => response.json())
       .then(data => {
-        const fileList2D = document.getElementById('fileList2D');
+        //const fileList2D = document.getElementById('fileList2D');
         const fileList3D = document.getElementById('fileList3D');
         const fileListTerrain = document.getElementById('fileListTerrain'); // Añadir una lista de terrenos
         const fileList3Dtiles = document.getElementById('fileList3Dtiles');
-        fileList2D.innerHTML = '';
+        //fileList2D.innerHTML = '';
         fileList3D.innerHTML = '';
         fileListTerrain.innerHTML = ''; // Limpiar la lista de terrenos
         fileList3Dtiles.innerHTML = '';
 
-        data.files2D.forEach(file => {
+        /* data.files2D.forEach(file => {
           addFileToList(file, fileList2D);
-        });
+        }); */
 
         data.files3D.forEach(file => {
           if (!file.name.endsWith('.geojson')) {
