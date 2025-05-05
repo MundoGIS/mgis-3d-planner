@@ -16,7 +16,7 @@
         "type": "3dtiles",
         "id": "96188",
         "url": "https://assets.cesium.com/96188/tileset.json",
-        "key": 1739371602225,
+        "key": 1746385489068,
         "visible": true
       },
       {
@@ -24,41 +24,40 @@
         "type": "3dtiles",
         "id": "2275207",
         "url": "https://assets.cesium.com/2275207/tileset.json",
-        "key": 1743587886983,
+        "key": 1746388574090,
         "visible": false
       }
     ],
     "terrains": [
-      {
-        "key": "1739371436532",
-        "name": "Word terrain",
-        "url": "https://assets.cesium.com/1/tileset.json",
-        "type": "ion",
-        "visible": true
-      },
       {
         "key": "1741957106237",
         "name": "Nacka Sweden",
         "url": "/terrain/demo_terrain/",
         "type": "local",
         "visible": false
+      },
+      {
+        "key": "1746384979421",
+        "name": "Cesium world terrain",
+        "url": "https://assets.cesium.com/1/tileset.json",
+        "type": "ion",
+        "visible": true
       }
     ]
   },
   "savedViews": [
     {
-      "name": "Default view",
+      "name": "Home",
       "position": [
-        7646657.331916487,
-        2199287.744898028,
-        11042194.814816602
+        8798969.906228293,
+        1840818.733073649,
+        15583499.240535345
       ],
       "orientation": {
-        "heading": 0.13484325599741354,
-        "pitch": -1.5691086087817991,
+        "heading": 0.0635643237924457,
+        "pitch": -1.5701877114899814,
         "roll": 0
-      },
-      "isDefault": true
+      }
     }
   ]
 }

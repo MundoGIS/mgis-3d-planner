@@ -1,0 +1,24 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0,
+          0,
+          0
+        ]
+      },
+      "properties": {
+        "name": "buske_3m",
+        "scale": 1,
+        "minimumPixelSize": 128,
+        "horizontalRotation": 0,
+        "verticalRotation": 0,
+        "lateralRotation": 0
+      }
+    }
+  ]
+}
