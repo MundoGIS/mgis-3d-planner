@@ -6,7 +6,7 @@
 
 This software was developed by **MundoGIS**, a company specializing in GIS solutions and 3D data visualization.
 
-- **Website:** [https://mundogis.eu](https://mundogis.se)
+- **Website:** [https://mundogis.se](https://mundogis.se)
 - **Contact email:** abel.gonzalez@mundogis.se
 
 ## License
