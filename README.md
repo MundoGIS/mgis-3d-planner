@@ -7,7 +7,7 @@
 This software was developed by **MundoGIS**, a company specializing in GIS solutions and 3D data visualization.
 
 - **Website:** [https://mundogis.se](https://mundogis.se)
-- **Contact email:** abel.gonzalez@mundogis.se
+- **Contact email:** info@mundogis.se
 
 ## License
 This project is licensed under the [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/).
