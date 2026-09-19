@@ -1,4 +1,16 @@
 
+function initializeRedlineViewerBindings() {
+  if (!window.cesiumViewer || !window.cesiumViewer.cesiumWidget) {
+    return false;
+  }
+
+  window.cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+  return true;
+}
+
+if (!initializeRedlineViewerBindings()) {
+  window.addEventListener('cesium-viewer-ready', initializeRedlineViewerBindings, { once: true });
+}
 
 function openSaveDrawingModal() {
   console.log('Botón de guardar dibujo clickeado'); // Añade esta línea
@@ -481,8 +493,6 @@ function addGeoJsonToMap(geojson) {
 
 
 
-// Remover el doble clic predeterminado en Cesium
-cesiumViewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 window.selectedModel = null;
 var handler;
 var activeTool = null;
@@ -1162,12 +1172,6 @@ function applyDynamicRotation() {
   }
 }
 
-// Configurar el listener del clic derecho para abrir el cuadro de rotación (se ejecuta solo una vez)
-if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id === window.selectedModel) {
-  cesiumViewer.screenSpaceEventHandler.setInputAction(function (event) {
-    const pickedObject = cesiumViewer.scene.pick(event.position);
-    if (Cesium.defined(pickedObject) && pickedObject.id && pickedObject.id === selectedModel) {
-      openRotationDialog(event.position.x, event.position.y);
-    }
-  }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
-}
+// No se registra un listener duplicado aquí; el manejo de clic derecho
+// se realiza en la función de carga del modelo para evitar referencias
+// a variables no definidas y callbacks repetidos.

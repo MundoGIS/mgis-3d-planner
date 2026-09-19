@@ -1,0 +1,63 @@
+{
+  "id": "f64c2666-2d94-4b0e-88c9-601098ff8e18",
+  "name": "default",
+  "cesiumToken": "",
+  "config": {
+    "layers": [
+      {
+        "name": "OpenStreetMap",
+        "type": "osm",
+        "isBaseLayer": true,
+        "key": 1726655123501,
+        "visible": true
+      },
+      {
+        "name": "OSM buildings",
+        "type": "3dtiles",
+        "id": "96188",
+        "url": "https://assets.cesium.com/96188/tileset.json",
+        "key": 1746385489068,
+        "visible": true
+      },
+      {
+        "name": "Googles",
+        "type": "3dtiles",
+        "id": "2275207",
+        "url": "https://assets.cesium.com/2275207/tileset.json",
+        "key": 1746388574090,
+        "visible": false
+      }
+    ],
+    "terrains": [
+      {
+        "key": "1741957106237",
+        "name": "Nacka Sweden",
+        "url": "/terrain/demo_terrain/",
+        "type": "local",
+        "visible": false
+      },
+      {
+        "key": "1746384979421",
+        "name": "Cesium world terrain",
+        "url": "https://assets.cesium.com/1/tileset.json",
+        "type": "ion",
+        "visible": true
+      }
+    ]
+  },
+  "savedViews": [
+    {
+      "name": "Home",
+      "position": [
+        8798969.906228293,
+        1840818.733073649,
+        15583499.240535345
+      ],
+      "orientation": {
+        "heading": 0.0635643237924457,
+        "pitch": -1.5701877114899814,
+        "roll": 0
+      }
+    }
+  ]
+}

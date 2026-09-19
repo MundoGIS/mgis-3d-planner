@@ -14,19 +14,19 @@ fetch('/3d/api/load-cesium-token')
       throw new Error("Cesium token is missing in the configuration.");
     }
     Cesium.Ion.defaultAccessToken = config.cesiumToken;
-    Cesium.InfoBoxViewModel.defaultSanitizer = rawHtml => rawHtml;
 
-    // Crear el visor de Cesium con timeline y animation activados
+    // Start from a minimal viewer so optional widgets do not break the render loop.
     window.cesiumViewer = new Cesium.Viewer("cesiumContainer", {
+      baseLayer: false,
       selectionIndicator: false,
       baseLayerPicker: false,
-      infoBox: true,
-      geocoder: true,
+      infoBox: false,
+      geocoder: false,
       navigationHelpButton: false,
       fullscreenButton: false,
       homeButton: false,
-      timeline: true,
-      animation: true,
+      timeline: false,
+      animation: false,
       sceneModePicker: false,
       shouldAnimate: true,
       contextOptions: {
@@ -39,14 +39,11 @@ fetch('/3d/api/load-cesium-token')
 
 
     cesiumViewer.scene.globe.depthTestAgainstTerrain = true;
-
-    // Ocultar timeline y animation al inicio
-    cesiumViewer.timeline.container.style.display = 'none';
-    cesiumViewer.animation.container.style.display = 'none';
     cesiumViewer.clock.shouldAnimate = true;
 
 
     setupCesium();
+    window.dispatchEvent(new Event('cesium-viewer-ready'));
   })
   .catch(error => {
     console.error("Error loading Cesium configuration:", error);
@@ -56,19 +53,7 @@ let isPositioningActive = false;
 
 function setupCesium() {
 
-  // Inicializar navegación si está disponible
-  if (Cesium.viewerCesiumNavigationMixin) {
-    const options = {
-      defaultResetView: Cesium.Rectangle.fromDegrees(10, 55, 24, 69),
-      enableCompass: true,
-      enableZoomControls: true,
-      enableDistanceLegend: true,
-      enableCompassOuterRing: true,
-    };
-    cesiumViewer.extend(Cesium.viewerCesiumNavigationMixin, options);
-  } else {
-    console.warn("Cesium Navigation Mixin is not loaded.");
-  }
+  // Temporarily skip the navigation mixin while isolating the Cesium render crash.
   try {
     const scene = cesiumViewer.scene;
 
@@ -301,6 +286,11 @@ window.addEventListener("error", (event) => {
 // Alternar visibilidad de timeline
 function toggleTimeline() {
   try {
+    if (!cesiumViewer.timeline || !cesiumViewer.animation) {
+      console.warn("Timeline or animation widget is not available.");
+      return;
+    }
+
     const timelineElement = cesiumViewer.timeline.container;
     const animationElement = cesiumViewer.animation.container;
 

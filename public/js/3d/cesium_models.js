@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   try {
     const config = await fetch('/3d/api/load-cesium-token').then(res => res.json());
     Cesium.Ion.defaultAccessToken = config.cesiumToken;
-    console.log('Cesium Ion token loaded:', Cesium.Ion.defaultAccessToken);
+    console.log('Cesium Ion token loaded.');
 
     // Cargar terrenos de Ion después de configurar el token
     await loadIonTerrains(config);

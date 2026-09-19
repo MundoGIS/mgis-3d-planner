@@ -6,7 +6,6 @@
   <script src="/public/Thirdparty/Cesium/Build/Cesium/Cesium.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf/turf.min.js"></script>
-  <script src="/public/Thirdparty/cesium-navigation-1.1.8/dist/standalone/viewerCesiumNavigationMixin.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 
 
@@ -29,7 +28,7 @@
 
 </head>
 
-<body class="<%= isAuthenticated ? 'has-header' : '' %>">
+<body class="<%= isAuthenticated ? 'has-header' : '' %>" data-user-role="<%= userRole || '' %>">
 
   <% if (isAuthenticated && userRole==='admin' ) { %>
     <header id="header">
@@ -702,6 +701,7 @@
 
       <!-- Scripts -->
       <script src="/public/js/3d/cesium.js"></script>
+      <script src="/public/js/3d/navigation.js"></script>
       <script src="/public/js/3d/redline.js"></script>
       <script src="/public/js/3d/simulation.js"></script>
       <script>
@@ -834,11 +834,6 @@
         
         
               </script>
-
-      <script>
-        var userRole = "<%= userRole %>";
-      </script>
-
 
 </body>
 

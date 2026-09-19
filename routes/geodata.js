@@ -2,9 +2,8 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const fsExtra = require('fs-extra');
-const extractZip = require('extract-zip'); // Para descomprimir .zip
 const router = express.Router();
 
 
@@ -40,7 +39,30 @@ async function decompressZip(inputPath, outputPath) {
     throw new Error(`The output path is not absolute: ${absoluteOutput}`);
   }
   try {
-    await extractZip(inputPath, { dir: absoluteOutput });
+    await new Promise((resolve, reject) => {
+      if (process.platform === 'win32') {
+        execFile('powershell', [
+          '-NoProfile',
+          '-Command',
+          `Expand-Archive -LiteralPath '${inputPath.replace(/'/g, "''")}' -DestinationPath '${absoluteOutput.replace(/'/g, "''")}' -Force`
+        ], (error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+        return;
+      }
+
+      execFile('unzip', ['-o', inputPath, '-d', absoluteOutput], (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
     console.log('ZIP extraction successful:', absoluteOutput);
   } catch (err) {
     console.error('Error extracting the ZIP:', err);

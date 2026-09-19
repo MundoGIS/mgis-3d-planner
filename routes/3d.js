@@ -3,8 +3,39 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const axios = require('axios');
-const { DOMParser } = require('xmldom'); // Usar xmldom para analizar XML
 //const { Blob } = require('buffer'); // Asegúrate de usar Blob para manejar archivos binarios si es necesario
+
+const envFilePath = path.join(__dirname, '..', '.env');
+
+
+function getCesiumIonToken(config) {
+  return process.env.CESIUM_ION_TOKEN || config?.cesiumToken || null;
+}
+
+async function writeEnvVariable(name, value) {
+  const normalizedValue = value ?? '';
+  let envContent = '';
+
+  try {
+    envContent = await fs.promises.readFile(envFilePath, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const variablePattern = new RegExp(`^${escapedName}=.*$`, 'm');
+  const nextLine = `${name}=${normalizedValue}`;
+
+  if (variablePattern.test(envContent)) {
+    envContent = envContent.replace(variablePattern, nextLine);
+  } else {
+    envContent = `${envContent.trimEnd()}${envContent ? '\n' : ''}${nextLine}\n`;
+  }
+
+  await fs.promises.writeFile(envFilePath, envContent, 'utf8');
+}
 
 
 // Define la ruta global para la configuración de JSONs
@@ -389,7 +420,7 @@ router.get('/api/load-ion-token', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    const token = config.cesiumToken; // Ajuste realizado aquí
+    const token = getCesiumIonToken(config);
 
     if (!token) {
       return res.json({ token: null });
@@ -403,7 +434,7 @@ router.get('/api/load-ion-token', async (req, res) => {
 });
 
 router.post('/api/save-ion-token', async (req, res) => {
-  const { token } = req.body;
+  const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
   const configName = 'default';
   const filePath = path.join(configDir, `${configName}.json`);
 
@@ -411,10 +442,12 @@ router.post('/api/save-ion-token', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    config.cesiumToken = token; // Ajuste realizado aquí
+    await writeEnvVariable('CESIUM_ION_TOKEN', token);
+    process.env.CESIUM_ION_TOKEN = token;
+    config.cesiumToken = '';
 
     await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
-    res.json({ message: 'Token saved successfully' });
+    res.json({ message: 'Token saved successfully in .env' });
   } catch (error) {
     console.error('Error saving Cesium Ion token:', error.message);
     res.status(500).json({ error: 'Error saving Cesium Ion token' });
@@ -431,7 +464,7 @@ router.get('/api/proxy-ion-assets', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    const token = config.cesiumToken; // Asegúrate de que el token esté en la raíz de config
+    const token = getCesiumIonToken(config);
 
     if (!token) {
       return res.status(400).json({ error: 'Cesium Ion token not found' });
@@ -441,14 +474,29 @@ router.get('/api/proxy-ion-assets', async (req, res) => {
     const response = await axios.get('https://api.cesium.com/v1/assets', {
       headers: {
         Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
       },
     });
 
     // Enviar la respuesta de vuelta al cliente
     res.status(200).json(response.data);
   } catch (error) {
-    console.error('Error fetching Cesium Ion assets:', error.message);
-    res.status(500).json({ error: 'Error fetching Cesium Ion assets' });
+    const statusCode = error.response?.status || 500;
+    const details = error.response?.data || error.message;
+    const detailMessage = typeof details === 'string'
+      ? details
+      : details?.message || error.message;
+
+    let clientMessage = 'Error fetching Cesium Ion assets';
+    if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
+      clientMessage = 'Your Cesium Ion token can load assets by id, but listing account assets requires a token with assets:list or assets:limited-list scope.';
+    }
+
+    console.error('Error fetching Cesium Ion assets:', details);
+    res.status(statusCode).json({
+      error: clientMessage,
+      details: detailMessage
+    });
   }
 });
 
@@ -649,9 +697,8 @@ router.get('/api/loadWmsLayers', async (req, res) => {
       throw new Error('Failed to fetch WMS layers');
     }
 
-    const xmlDoc = new DOMParser().parseFromString(response.data, 'text/xml');
-    const layers = Array.from(xmlDoc.getElementsByTagName('Name')).map(layer => ({
-      name: layer.textContent
+    const layers = Array.from(response.data.matchAll(/<Name>([^<]+)<\/Name>/g)).map(match => ({
+      name: match[1]
     }));
 
     res.json(layers);
@@ -725,7 +772,7 @@ router.get('/api/load-cesium-token', (req, res) => {
     
     try {
       const config = JSON.parse(data);
-      res.json({ cesiumToken: config.cesiumToken });
+      res.json({ cesiumToken: getCesiumIonToken(config) });
     } catch (parseError) {
       console.error('Error parsing config file:', parseError);
       res.status(500).json({ error: 'Error parsing config file' });

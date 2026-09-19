@@ -2,6 +2,7 @@ let currentConfigName = 'default'; // Default configuration name
 let selectedTerrain = null;
 //let loadedLayers = {}; // Store loaded layers
 let loadedTerrains = [];
+const userRole = document.body?.dataset?.userRole || '';
 
 document.addEventListener('DOMContentLoaded', function () {
   const reloadMapButton = document.getElementById('reloadMapButton');
@@ -18,7 +19,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  loadLayers();
+  if (window.cesiumViewer && window.cesiumViewer.imageryLayers) {
+    loadLayers();
+  } else {
+    window.addEventListener('cesium-viewer-ready', () => loadLayers(), { once: true });
+  }
 });
 
 
@@ -1103,6 +1108,24 @@ async function addLayerDialog() {
               </select>
             </div>
           </div>
+          <p class="help" id="ionAssetsHelp">If your token cannot list assets, enter the asset ID manually below.</p>
+          <div class="field" style="margin-top: 0.75rem;">
+            <label class="label">Manual Cesium Ion asset ID</label>
+            <div class="control">
+              <input class="input" type="text" id="ionAssetIdInput" placeholder="Example: 96188">
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Manual asset type</label>
+            <div class="control">
+              <div class="select">
+                <select id="ionAssetTypeSelect">
+                  <option value="3dtiles">3D Tiles</option>
+                  <option value="terrain">Terrain</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- GLTF -->
@@ -1190,6 +1213,8 @@ async function addLayerDialog() {
   const wmsLayerSelect = document.getElementById('wmsLayerSelect');
   const wmsIsBaseLayer = document.getElementById('wmsIsBaseLayer');
   const ionAssetsSelect = document.getElementById('ionAssetsSelect');
+  const ionAssetIdInput = document.getElementById('ionAssetIdInput');
+  const ionAssetTypeSelect = document.getElementById('ionAssetTypeSelect');
   const gltfSelect = document.getElementById('gltfSelect');
 
   // Limpia y oculta todos los campos
@@ -1437,8 +1462,14 @@ async function addLayerDialog() {
       const response = await fetch('/3d/api/proxy-ion-assets');
       const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(data.details?.message || data.error || 'Failed to load Cesium Ion assets.');
+      }
+
+      const items = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : [];
+
       // Filtra y muestra solo terrenos y 3D Tiles
-      const combinedAssets = data.items.filter(
+      const combinedAssets = items.filter(
         asset => asset.type === 'TERRAIN' || asset.type === '3DTILES'
       );
 
@@ -1454,11 +1485,21 @@ async function addLayerDialog() {
           )
           .join('');
         ionAssetsSelect.parentElement.style.display = 'block'; // Muestra el dropdown
+        if (ionAssetIdInput) {
+          ionAssetIdInput.value = '';
+        }
       } else {
         ionAssetsSelect.innerHTML = `<option value="">No assets found</option>`;
       }
     } catch (error) {
       console.error('Error loading Cesium Ion files:', error);
+      const ionAssetsSelect = document.getElementById('ionAssetsSelect');
+      if (ionAssetsSelect) {
+        ionAssetsSelect.innerHTML = `<option value="">${error.message || 'Unable to load Cesium Ion assets'}</option>`;
+      }
+      if (ionAssetIdInput) {
+        ionAssetIdInput.focus();
+      }
     }
   }
 
@@ -1476,8 +1517,11 @@ async function addLayerDialog() {
     const type = document.getElementById("selectType").value;
     const name = document.getElementById("nameInput").value.trim();
 
-    const ionAssetId = ionAssetsSelect?.value;
-    const assetType = ionAssetsSelect?.selectedOptions[0]?.getAttribute("data-type");
+    const listedIonAssetId = ionAssetsSelect?.value;
+    const listedAssetType = ionAssetsSelect?.selectedOptions[0]?.getAttribute("data-type");
+    const manualIonAssetId = ionAssetIdInput?.value.trim();
+    const ionAssetId = manualIonAssetId || listedIonAssetId;
+    const assetType = manualIonAssetId ? ionAssetTypeSelect?.value : listedAssetType;
     const tilesetName = tilesSelect?.value;
     const gltfName = gltfSelect?.value;
     const glbName = document.getElementById("glbSelect")?.value;  // <-- Agregado para GLB
@@ -1496,7 +1540,7 @@ async function addLayerDialog() {
         // ------------------------------------------------------
         case "ion":
           if (!ionAssetId || !assetType) {
-            alert("Please choose a valid Ion asset and name.");
+            alert("Please choose a valid Ion asset or enter a manual asset ID.");
             return;
           }
           if (assetType === "terrain") {

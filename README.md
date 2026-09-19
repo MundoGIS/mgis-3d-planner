@@ -12,6 +12,9 @@ This software was developed by **MundoGIS**, a company specializing in GIS solut
 ## License
 This project is licensed under the [Mozilla Public License 2.0](https://mozilla.org/MPL/2.0/).
 
+## Third-Party Licenses
+See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the bundled third-party components and their license notes.
+
 ## Disclaimer
 The open source version of MGIS 3D-Planner provides basic functionality. For advanced features, including additional tools and premium support, consider [MGIS 3D-Planner Plus](https://mundogis.eu/3dplannerplus).
 
@@ -66,8 +69,18 @@ To install MGIS 3D-Planner, follow these steps:
    npm install
 4. Open the .env file and assign appropriate values to each variable:
 
+APP_ENV=development
+APP_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3000
+SESSION_COOKIE_SECURE=false
+SESSION_COOKIE_SAME_SITE=lax
 SESSION_SECRET=your_session_secret_here
 JWT_SECRET=your_jwt_secret_here
+CESIUM_ION_TOKEN=your_cesium_ion_token_here
+
+For production, switch `APP_ENV` to `production`, set `APP_URL` and `CORS_ORIGIN` to your public DNS, set `SESSION_COOKIE_SECURE=true`, and prefer `SESSION_COOKIE_SAME_SITE=strict`.
+
+The installer can also generate these values for you interactively when you run `install.bat`.
 
 5. Update the default admin user credentials in app.js. The default credentials are:
 Username: admin
@@ -78,7 +91,9 @@ It is strongly recommended to create a free account on Cesium Ion to access high
 
 ## Benefits of Cesium Ion Integration:
 Access global terrain datasets for realistic visualizations.
-To use Cesium Ion, generate a token from your account and update the configuration in app.js with your token. Without this step, MGIS 3D-Planner will run with limited terrain functionality.
+To use Cesium Ion, generate a token from your account and store it in your local .env file as CESIUM_ION_TOKEN. The server reads it at runtime and falls back to the local configuration if needed. Without this step, MGIS 3D-Planner will run with limited terrain functionality.
+
+If you want the app to list your Cesium Ion assets inside the UI, create a token that includes `assets:list` or `assets:limited-list` scope in addition to normal asset access.
 
 ## Running as a Service (Windows)
 To run MGIS 3D-Planner as a service on Windows:
