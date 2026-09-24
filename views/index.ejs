@@ -156,7 +156,25 @@
         </div>
     </div>
 
-    <script src="/public/js/login-modal.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var loginBtn = document.getElementById('loginBtn');
+            if (loginBtn) {
+                loginBtn.addEventListener('click', function () {
+                    document.getElementById('loginModal').classList.add('is-active');
+                });
+            }
+
+            var cancelLoginButton = document.getElementById('cancelLoginButton');
+            if (cancelLoginButton) {
+                document.querySelectorAll('#loginModal .delete, #cancelLoginButton').forEach(el => {
+                    el.addEventListener('click', () => {
+                        document.getElementById('loginModal').classList.remove('is-active');
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

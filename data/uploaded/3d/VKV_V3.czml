@@ -1,0 +1,85 @@
+[
+{
+    "version": "1.0",
+    "id": "document",
+    "name": "VKV_Z \u2014 VKV_V3"
+}
+    ,{
+        "position": {
+            "cartographicDegrees": [
+                "15.3052903" 
+                ,"63.9981478" 
+                ,381
+            ]
+        }
+         ,"id": "1"
+        ,"name": "NewWTG"
+        ,"model": {
+            "gltf" : "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf"
+            ,"nodeTransformations": {
+                "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf": {
+                    "rotation": {
+                        "unitQuaternion": [
+                            0.0, -0.0, 0.0 , 1.0
+                        ]
+                    }
+                }
+            }
+            ,"minimumPixelSize": 24
+            ,"maximumScale": 10000
+        }
+        ,"description": "VESTAS V136-4.5 4500 136.0 !O! nav: 112,0 m (TOT:180,0 m) (4)"
+    }
+    ,{
+        "position": {
+            "cartographicDegrees": [
+                "15.2054711" 
+                ,"63.9983275" 
+                ,403
+            ]
+        }
+         ,"id": "2"
+        ,"name": "NewWTG"
+        ,"model": {
+            "gltf" : "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf"
+            ,"nodeTransformations": {
+                "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf": {
+                    "rotation": {
+                        "unitQuaternion": [
+                            0.0, -0.0, 0.0 , 1.0
+                        ]
+                    }
+                }
+            }
+            ,"minimumPixelSize": 24
+            ,"maximumScale": 10000
+        }
+        ,"description": "VESTAS V136-4.5 4500 136.0 !O! nav: 112,0 m (TOT:180,0 m) (5)"
+    }
+    ,{
+        "position": {
+            "cartographicDegrees": [
+                "15.2253463" 
+                ,"63.9872744" 
+                ,355
+            ]
+        }
+         ,"id": "3"
+        ,"name": "NewWTG"
+        ,"model": {
+            "gltf" : "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf"
+            ,"nodeTransformations": {
+                "https://int.rabbalshedekraft.se/3d/Vestas_V126_130m.gltf": {
+                    "rotation": {
+                        "unitQuaternion": [
+                            0.0, -0.0, 0.0 , 1.0
+                        ]
+                    }
+                }
+            }
+            ,"minimumPixelSize": 24
+            ,"maximumScale": 10000
+        }
+        ,"description": "VESTAS V136-4.5 4500 136.0 !O! nav: 112,0 m (TOT:180,0 m) (6)"
+    }
+]

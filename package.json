@@ -26,8 +26,10 @@
     "node": ">=20.11.0 <25"
   },
   "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
     "axios": "1.20.0",
     "bcrypt": "6.0.0",
+    "body-parser": "1.20.8",
     "connect-flash": "0.1.1",
     "cookie-parser": "1.4.7",
     "cors": "2.8.5",
@@ -38,7 +40,9 @@
     "express-session": "1.19.0",
     "fs-extra": "11.2.0",
     "helmet": "7.0.0",
-    "node-windows": "1.0.0-beta.8"
+    "jsonwebtoken": "9.0.2",
+    "node-windows": "1.0.0-beta.8",
+    "unzipper": "0.12.3"
   },
   "devDependencies": {
     "nodemon": "3.0.1"

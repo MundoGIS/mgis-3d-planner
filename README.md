@@ -77,10 +77,13 @@ SESSION_COOKIE_SAME_SITE=lax
 SESSION_SECRET=your_session_secret_here
 JWT_SECRET=your_jwt_secret_here
 CESIUM_ION_TOKEN=your_cesium_ion_token_here
+QGIS_PATH=C:\Program Files\QGIS 3.44
 
 For production, switch `APP_ENV` to `production`, set `APP_URL` and `CORS_ORIGIN` to your public DNS, set `SESSION_COOKIE_SECURE=true`, and prefer `SESSION_COOKIE_SAME_SITE=strict`.
 
 The installer can also generate these values for you interactively when you run `install.bat`.
+
+`QGIS_PATH` is optional unless you want to generate Cesium terrain from a DTM. It must point to a complete QGIS 3.x installation containing its Python and GDAL runtime. In **Upload your Geodata**, select **DTM GeoTIFF** and upload a georeferenced `.tif`, `.tiff`, `.geotif`, or `.geotiff`. The application generates a tiled heightmap terrain and makes it available with the other local terrains. The optional maximum zoom can be left empty to derive it from the raster resolution.
 
 5. Update the default admin user credentials in app.js. The default credentials are:
 Username: admin

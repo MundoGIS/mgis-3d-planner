@@ -7,38 +7,22 @@ require('dotenv').config();
 
 const session = require('express-session');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const flash = require('connect-flash');
-const helmet = require('helmet');
 const cesium = require('./routes/3d');
 const Geodata = require('./routes/geodata');
 const aboutUS = require('./routes/om-gism')
 const fs = require('fs');
 const usersFilePath = path.join(__dirname, './auth/users.json');
+const bodyParser = require('body-parser');
+const axios = require('axios');
 
 
 
 const cookieParser = require('cookie-parser');
 const app = express();
-
-const appEnvironment = (process.env.APP_ENV || process.env.NODE_ENV || 'development').toLowerCase();
-const isProduction = appEnvironment === 'production';
-const trustProxy = Number.parseInt(process.env.TRUST_PROXY || (isProduction ? '1' : '0'), 10);
-const sessionCookieSecure = process.env.SESSION_COOKIE_SECURE
-  ? process.env.SESSION_COOKIE_SECURE === 'true'
-  : isProduction;
-const sessionCookieSameSite = process.env.SESSION_COOKIE_SAME_SITE || 'lax';
-
-if (Number.isFinite(trustProxy) && trustProxy > 0) {
-  app.set('trust proxy', trustProxy);
-}
-
-if (isProduction && !process.env.SESSION_SECRET) {
-  throw new Error('SESSION_SECRET is required when APP_ENV is production');
-}
-
-app.disable('x-powered-by');
 
 
 
@@ -47,53 +31,12 @@ app.set('view engine', 'ejs');
 app.set('views', ['views', 'auth']);
 
 app.use(cookieParser());
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "'wasm-unsafe-eval'",
-        'https://cdn.jsdelivr.net',
-        'https://cdnjs.cloudflare.com',
-        'https://unpkg.com'
-      ],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      fontSrc: ["'self'", 'data:', 'https://unpkg.com'],
-      connectSrc: [
-        "'self'",
-        'https://api.cesium.com',
-        'https://assets.cesium.com',
-        'https://tile.openstreetmap.org',
-        'https://*.tile.openstreetmap.org',
-        'https://cdn.jsdelivr.net',
-        'https://cdnjs.cloudflare.com'
-      ],
-      workerSrc: ["'self'", 'blob:'],
-      childSrc: ["'self'", 'blob:'],
-      mediaSrc: ["'self'", 'blob:', 'data:'],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"]
-    }
-  },
-  crossOriginEmbedderPolicy: false
-}));
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: sessionCookieSecure,
-    httpOnly: true,
-    sameSite: sessionCookieSameSite
-  }
+  saveUninitialized: true,
+  cookie: { secure: false } // Configura como true si estás usando HTTPS
 }));
 
 function isAuthenticated(req, res, next) {
@@ -109,19 +52,11 @@ function isAuthenticated(req, res, next) {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(flash());
-
-const corsOriginConfig = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);
-
-if (corsOriginConfig.length > 0) {
-  app.use(cors({
-    origin: corsOriginConfig.length === 1 ? corsOriginConfig[0] : corsOriginConfig,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true
-  }));
-}
+app.use(cors({
+  origin: '*', // O especifica el dominio que necesita acceso
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true
+}));
 
 
 app.use(express.static('data'));
@@ -159,6 +94,9 @@ app.get('/terrain/*', isAuthenticated, (req, res) => {
 app.use('/data', isAuthenticated, checkRole('user', 'admin'), Geodata);
 app.use('/3d', isAuthenticated, checkRole('user', 'admin'), cesium);
 app.use('/about', isAuthenticated, checkRole('user', 'admin'), aboutUS);
+
+// Autenticación básica para GeoServer
+const auth = 'Basic ' + Buffer.from(`${process.env.WFS_USERNAME}:${process.env.WFS_PASSWORD}`).toString('base64');
 
 // No-cache headers
 app.use((req, res, next) => {
@@ -240,9 +178,9 @@ app.get('/', (req, res) => {
 
 
 // Ruta para la página de inicio de sesión
-app.get('/login', (req, res) => {
+/* app.get('/login', (req, res) => {
   res.render('login');
-});
+}); */
 
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
@@ -269,16 +207,8 @@ app.post('/login', (req, res) => {
         return;
       }
       if (result) {
-        req.session.regenerate((sessionError) => {
-          if (sessionError) {
-            console.error('Error al regenerar la sesión:', sessionError);
-            res.status(500).send('Error interno del servidor');
-            return;
-          }
-
-          req.session.user = { username: user.username, role: user.role };
-          res.redirect('/');
-        });
+        req.session.user = { username: user.username, role: user.role };
+        res.redirect('/');
       } else {
         req.flash('error', 'Wrong credentials, please try again!');
         res.redirect('/login');
@@ -293,7 +223,6 @@ app.get('/logout', (req, res) => {
     if (err) {
       console.error('Error al cerrar la sesión:', err);
     }
-    res.clearCookie('connect.sid');
     res.redirect('/'); // Redirecciona a la página principal después de hacer logout
   });
 });
@@ -396,7 +325,7 @@ app.use((req, res, next) => {
   res.status(404).render('404');
 });
 
-const port = 3000;
+const port = Number.parseInt(process.env.PORT, 10) || 3001;
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });

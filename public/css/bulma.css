@@ -392,8 +392,13 @@ hr {
 }
 
 img {
-  height: auto;
   max-width: 100%;
+  height: 100%;
+}
+
+img.mundogis {
+  max-width: 300%;
+  height: 100%;
 }
 
 input[type="checkbox"],
@@ -6186,8 +6191,10 @@ a.navbar-item:focus, a.navbar-item:focus-within, a.navbar-item:hover, a.navbar-i
 }
 
 .navbar-item img {
-  max-height: 1.75rem;
-}
+        max-height: 1 rem;
+        padding-right: 2.5rem;
+        margin-left: 0%;
+    }
 
 .navbar-item.has-dropdown {
   padding: 0;
@@ -11848,4 +11855,6 @@ a.has-text-danger-dark:hover, a.has-text-danger-dark:focus {
   background-color: #fafafa;
   padding: 3rem 1.5rem 6rem;
 }
+
+
 /*# sourceMappingURL=bulma.css.map */

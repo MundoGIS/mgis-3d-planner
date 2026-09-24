@@ -2,9 +2,103 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 const path = require('path');
-const { exec, execFile } = require('child_process');
+const { exec, spawn } = require('child_process');
+const { pipeline } = require('stream/promises');
 const fsExtra = require('fs-extra');
+const unzipper = require('unzipper');
 const router = express.Router();
+
+
+function findQgisRuntime() {
+  const configuredRoot = process.env.QGIS_PATH || process.env.QGIS_ROOT;
+  const qgisRoot = configuredRoot
+    ? path.resolve(configuredRoot)
+    : (process.env.OSGEO4W_BIN ? path.dirname(path.resolve(process.env.OSGEO4W_BIN)) : null);
+  const prefix = process.env.QGIS_PREFIX || (qgisRoot && ['qgis-ltr', 'qgis']
+    .map(name => path.join(qgisRoot, 'apps', name))
+    .find(candidate => fs.existsSync(candidate)));
+
+  let pythonExecutable = process.env.PYTHON_EXE;
+  if (!pythonExecutable && qgisRoot) {
+    const appsDirectory = path.join(qgisRoot, 'apps');
+    if (fs.existsSync(appsDirectory)) {
+      const pythonDirectory = fs.readdirSync(appsDirectory)
+        .filter(name => name.toLowerCase().startsWith('python'))
+        .sort()
+        .reverse()
+        .find(name => fs.existsSync(path.join(appsDirectory, name, 'python.exe')));
+      if (pythonDirectory) {
+        pythonExecutable = path.join(appsDirectory, pythonDirectory, 'python.exe');
+      }
+    }
+    if (!pythonExecutable) {
+      const binDirectory = path.join(qgisRoot, 'bin');
+      if (fs.existsSync(binDirectory)) {
+        const pythonFile = fs.readdirSync(binDirectory)
+          .filter(name => /^python(?:3(?:\.\d+)?)?\.exe$/i.test(name))
+          .sort()
+          .reverse()[0];
+        if (pythonFile) {
+          pythonExecutable = path.join(binDirectory, pythonFile);
+        }
+      }
+    }
+  }
+
+  if (!qgisRoot || !prefix || !pythonExecutable || !fs.existsSync(pythonExecutable)) {
+    return null;
+  }
+
+  return {
+    pythonExecutable,
+    environment: {
+      ...process.env,
+      PATH: [path.join(qgisRoot, 'bin'), path.join(prefix, 'bin'), process.env.PATH].filter(Boolean).join(path.delimiter),
+      PYTHONHOME: path.dirname(pythonExecutable),
+      PYTHONPATH: path.join(prefix, 'python'),
+      QGIS_PREFIX_PATH: prefix,
+      QT_PLUGIN_PATH: process.env.QT_PLUGIN_PATH || path.join(prefix, 'qtplugins'),
+      GDAL_DATA: process.env.GDAL_DATA || path.join(qgisRoot, 'apps', 'gdal', 'share', 'gdal'),
+      PROJ_DATA: process.env.PROJ_DATA || path.join(qgisRoot, 'share', 'proj'),
+      PROJ_LIB: process.env.PROJ_LIB || path.join(qgisRoot, 'share', 'proj')
+    }
+  };
+}
+
+function runHeightmapBuilder(sourcePath, outputPath, maxZoom) {
+  const runtime = findQgisRuntime();
+  if (!runtime) {
+    throw new Error('QGIS is not configured. Set QGIS_PATH in .env to the QGIS installation folder and restart the application.');
+  }
+
+  const scriptPath = path.join(__dirname, '..', 'tools', 'build_heightmap_terrain.py');
+  const args = [scriptPath, sourcePath, outputPath];
+  if (Number.isInteger(maxZoom)) {
+    args.push('--max-zoom', String(maxZoom));
+  }
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(runtime.pythonExecutable, args, {
+      env: runtime.environment,
+      windowsHide: true
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', data => { stdout += data.toString(); });
+    child.stderr.on('data', data => { stderr += data.toString(); });
+    child.on('error', reject);
+    child.on('close', code => {
+      if (code !== 0) {
+        return reject(new Error(stderr.trim() || `QGIS terrain processing exited with code ${code}.`));
+      }
+      try {
+        resolve(JSON.parse(stdout.trim().split(/\r?\n/).pop()));
+      } catch (error) {
+        reject(new Error(`QGIS returned an invalid result: ${error.message}`));
+      }
+    });
+  });
+}
 
 
 async function moveFileOrDirectory(source, destination) {
@@ -35,39 +129,37 @@ async function findFileRecursive(dir, fileName) {
 async function decompressZip(inputPath, outputPath) {
   const absoluteOutput = path.resolve(outputPath);
   console.log('Unzipping ZIP in:', absoluteOutput);
-  if (!path.isAbsolute(absoluteOutput)) {
-    throw new Error(`The output path is not absolute: ${absoluteOutput}`);
-  }
-  try {
-    await new Promise((resolve, reject) => {
-      if (process.platform === 'win32') {
-        execFile('powershell', [
-          '-NoProfile',
-          '-Command',
-          `Expand-Archive -LiteralPath '${inputPath.replace(/'/g, "''")}' -DestinationPath '${absoluteOutput.replace(/'/g, "''")}' -Force`
-        ], (error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-        return;
-      }
+  const archive = await unzipper.Open.file(inputPath);
+  for (const entry of archive.files) {
+    const entryPath = entry.path.replace(/\\/g, '/');
+    const pathSegments = entryPath.split('/').filter(Boolean);
+    const unixFileType = (entry.externalFileAttributes >>> 16) & 0o170000;
 
-      execFile('unzip', ['-o', inputPath, '-d', absoluteOutput], (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
-    console.log('ZIP extraction successful:', absoluteOutput);
-  } catch (err) {
-    console.error('Error extracting the ZIP:', err);
-    throw err;
+    if (
+      !entryPath ||
+      entryPath.startsWith('/') ||
+      /^[a-zA-Z]:/.test(entryPath) ||
+      pathSegments.includes('..') ||
+      entryPath.includes('\0') ||
+      unixFileType === 0o120000
+    ) {
+      throw new Error(`Unsafe ZIP entry rejected: ${entry.path}`);
+    }
+
+    const destination = path.resolve(absoluteOutput, ...pathSegments);
+    if (destination !== absoluteOutput && !destination.startsWith(`${absoluteOutput}${path.sep}`)) {
+      throw new Error(`ZIP entry escapes its destination: ${entry.path}`);
+    }
+
+    if (entry.type === 'Directory') {
+      await fs.promises.mkdir(destination, { recursive: true });
+      continue;
+    }
+
+    await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+    await pipeline(entry.stream(), fs.createWriteStream(destination, { flags: 'wx' }));
   }
+  console.log('ZIP extraction successful:', absoluteOutput);
 }
 
 
@@ -123,6 +215,10 @@ const allowedFormats3DTiles = [
 
 const allowedFormatsTerrain = [
   '.zip'
+];
+
+const allowedFormatsDtm = [
+  '.tif', '.tiff', '.geotif', '.geotiff'
 ];
 
 const allowedFormats2D = [
@@ -185,6 +281,9 @@ router.post('/api/files', async (req, res) => {
     case 'terrain':
       allowedFormats = allowedFormatsTerrain;
       break;
+    case 'dtm':
+      allowedFormats = allowedFormatsDtm;
+      break;
     case '3Dtiles':
       allowedFormats = allowedFormats3DTiles;
       break;
@@ -200,6 +299,9 @@ router.post('/api/files', async (req, res) => {
       uploadPath = req.paths['3dPath'];
       break;
     case 'terrain':
+      uploadPath = req.paths['TerrainPath'];
+      break;
+    case 'dtm':
       uploadPath = req.paths['TerrainPath'];
       break;
     case '3Dtiles':
@@ -219,6 +321,7 @@ router.post('/api/files', async (req, res) => {
 
   for (const file of files) {
     const fileExtension = path.extname(file.name).toLowerCase();
+    const safeBaseName = path.basename(file.name, fileExtension).replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
     const filePath = path.join(uploadPath, file.name);
 
     // 1) Revisar extensión
@@ -227,6 +330,51 @@ router.post('/api/files', async (req, res) => {
         name: file.name,
         error: 'File format not allowed.'
       });
+      continue;
+    }
+
+    if (uploadType === 'dtm') {
+      if (!safeBaseName) {
+        unsupportedFiles.push({ name: file.name, error: 'The DTM file name is invalid.' });
+        continue;
+      }
+
+      const finalDirectory = path.join(uploadPath, safeBaseName);
+      const workingDirectory = `${finalDirectory}.processing-${Date.now()}`;
+      const temporarySource = path.join(uploadPath, `.upload-${Date.now()}-${safeBaseName}${fileExtension}`);
+      const requestedZoom = req.body.maxZoom === '' || typeof req.body.maxZoom === 'undefined'
+        ? null
+        : Number.parseInt(req.body.maxZoom, 10);
+
+      if (fs.existsSync(finalDirectory)) {
+        unsupportedFiles.push({ name: file.name, error: `A terrain named "${safeBaseName}" already exists.` });
+        continue;
+      }
+      if (requestedZoom !== null && (!Number.isInteger(requestedZoom) || requestedZoom < 0 || requestedZoom > 14)) {
+        unsupportedFiles.push({ name: file.name, error: 'Maximum zoom must be between 0 and 14.' });
+        continue;
+      }
+
+      try {
+        await file.mv(temporarySource);
+        const metadata = await runHeightmapBuilder(temporarySource, workingDirectory, requestedZoom);
+        const sourceFileName = `source${fileExtension}`;
+        await fs.promises.copyFile(temporarySource, path.join(workingDirectory, sourceFileName));
+        const layerPath = path.join(workingDirectory, 'layer.json');
+        const layerMetadata = JSON.parse(await fs.promises.readFile(layerPath, 'utf8'));
+        layerMetadata.source = sourceFileName;
+        layerMetadata.sourceName = file.name;
+        await fs.promises.writeFile(layerPath, JSON.stringify(layerMetadata, null, 2), 'utf8');
+        await fs.promises.rename(workingDirectory, finalDirectory);
+        uploadedFiles.push(file.name);
+        console.log(`DTM terrain generated at ${finalDirectory} with ${metadata.tileCount} tiles.`);
+      } catch (error) {
+        console.error(`Error processing DTM ${file.name}:`, error);
+        await fsExtra.remove(workingDirectory);
+        unsupportedFiles.push({ name: file.name, error: error.message });
+      } finally {
+        await fsExtra.remove(temporarySource);
+      }
       continue;
     }
 
@@ -409,6 +557,59 @@ router.get('/api/terrainExtent/:terrainName', (req, res) => {
   });
 });
 
+router.post('/api/terrains/:terrainName/regenerate', async (req, res) => {
+  const terrainName = path.basename(req.params.terrainName);
+  const terrainPath = path.join(terrainDir, terrainName);
+  const layerPath = path.join(terrainPath, 'layer.json');
+  const workingDirectory = `${terrainPath}.regenerating-${Date.now()}`;
+  const backupDirectory = `${terrainPath}.backup-${Date.now()}`;
+
+  try {
+    const currentMetadata = JSON.parse(await fs.promises.readFile(layerPath, 'utf8'));
+    const sourceFileName = path.basename(currentMetadata.source || '');
+    if (!sourceFileName || !/^source\.(?:tif|tiff|geotif|geotiff)$/i.test(sourceFileName)) {
+      return res.status(400).json({ error: 'This terrain has no retained GeoTIFF source.' });
+    }
+
+    const sourcePath = path.join(terrainPath, sourceFileName);
+    if (!fs.existsSync(sourcePath)) {
+      return res.status(404).json({ error: 'The retained GeoTIFF source was not found.' });
+    }
+
+    const requestedZoom = req.body.maxZoom === '' || typeof req.body.maxZoom === 'undefined'
+      ? null
+      : Number.parseInt(req.body.maxZoom, 10);
+    if (requestedZoom !== null && (!Number.isInteger(requestedZoom) || requestedZoom < 0 || requestedZoom > 14)) {
+      return res.status(400).json({ error: 'Maximum zoom must be between 0 and 14.' });
+    }
+
+    const metadata = await runHeightmapBuilder(sourcePath, workingDirectory, requestedZoom);
+    await fs.promises.copyFile(sourcePath, path.join(workingDirectory, sourceFileName));
+    metadata.source = sourceFileName;
+    metadata.sourceName = currentMetadata.sourceName || sourceFileName;
+    await fs.promises.writeFile(
+      path.join(workingDirectory, 'layer.json'),
+      JSON.stringify(metadata, null, 2),
+      'utf8'
+    );
+
+    await fs.promises.rename(terrainPath, backupDirectory);
+    try {
+      await fs.promises.rename(workingDirectory, terrainPath);
+      await fsExtra.remove(backupDirectory);
+    } catch (publishError) {
+      await fs.promises.rename(backupDirectory, terrainPath);
+      throw publishError;
+    }
+
+    res.json({ message: 'DTM terrain regenerated successfully.', terrain: terrainName, metadata });
+  } catch (error) {
+    console.error(`Error regenerating DTM terrain ${terrainName}:`, error);
+    await fsExtra.remove(workingDirectory);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Resto de las rutas (sin modificaciones)
 router.get('/geodata', (req, res) => {
   //const files2DPath = twodDir;
@@ -500,7 +701,21 @@ router.get('/api/files', (req, res, next) => {
 
         // ==== Terreno ====
         else if (stats.isDirectory() && key === 'filesTerrainPath') {
-          filesTerrain.push({ name: file, type: 'terrain' });
+          const layerPath = path.join(filePath, 'layer.json');
+          if (fs.existsSync(layerPath)) {
+            let metadata = {};
+            try {
+              metadata = JSON.parse(fs.readFileSync(layerPath, 'utf8'));
+            } catch (error) {
+              console.warn(`Invalid layer.json in terrain ${file}:`, error.message);
+            }
+            filesTerrain.push({
+              name: file,
+              type: 'terrain',
+              format: metadata.format || 'quantized-mesh',
+              regenerable: Boolean(metadata.source && fs.existsSync(path.join(filePath, path.basename(metadata.source))))
+            });
+          }
         }
 
       });
@@ -648,7 +863,10 @@ router.get('/api/getLocalTerrains', (req, res) => {
       return res.status(500).send('Error reading terrain directory');
     }
 
-    const terrainFolders = files.filter(file => fs.statSync(path.join(terrainPath, file)).isDirectory());
+    const terrainFolders = files.filter(file => {
+      const folderPath = path.join(terrainPath, file);
+      return fs.statSync(folderPath).isDirectory() && fs.existsSync(path.join(folderPath, 'layer.json'));
+    });
     res.json(terrainFolders);
   });
 });
@@ -721,16 +939,6 @@ router.get('/api/positions/:fileName', isAuthenticated, (req, res) => {
   });
 });
 
-router.use((req, res) => {
-  res.status(404).send('Not Found');
-});
-
-router.use((err, req, res) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-});
-
-
 // Ruta para listar los 3D Tiles locales disponibles
 router.get('/api/getLocal3DTiles', (req, res) => {
   console.log('Tiles Directory:', tilesDir);
@@ -755,6 +963,14 @@ router.get('/api/getLocal3DTiles', (req, res) => {
   }
 });
 
+router.use((req, res) => {
+  res.status(404).send('Not Found');
+});
+
+router.use((err, req, res) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
 
 
 module.exports = router;

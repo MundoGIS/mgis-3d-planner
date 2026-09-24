@@ -61,7 +61,7 @@
 
                       <div class="control">
                         <label class="radio">
-                          <input type="radio" name="uploadType" value="3d">
+                          <input type="radio" name="uploadType" value="3d" checked>
                           <strong>3D</strong>
                           <small class="has-text-grey">
                             (GLTF, GLB, CZML, KML, KMZ)
@@ -88,6 +88,24 @@
                           </small>
                         </label>
                       </div>
+
+                      <div class="control">
+                        <label class="radio">
+                          <input type="radio" name="uploadType" value="dtm">
+                          <strong>DTM GeoTIFF</strong>
+                          <small class="has-text-grey">
+                            (Generate Cesium heightmap terrain)
+                          </small>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div id="dtmOptions" class="field is-grouped is-align-items-center" hidden>
+                      <label class="label" for="maxZoom">Maximum zoom</label>
+                      <div class="control">
+                        <input id="maxZoom" name="maxZoom" class="input" type="number" min="0" max="14" placeholder="Auto">
+                      </div>
+                      <p class="help">Leave empty to use the DTM resolution.</p>
                     </div>
 
                     <!-- Vista previa (solo para imágenes) -->
@@ -202,6 +220,7 @@
         </div>
 
         <!-- Script con tu lógica de Cesium y subida de archivos -->
+        <script src="/public/js/3d/heightmap-terrain-provider.js"></script>
         <script src="/public/js/3d/cesium_models.js"></script>
 </body>
 

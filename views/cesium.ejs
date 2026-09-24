@@ -28,7 +28,7 @@
 
 </head>
 
-<body class="<%= isAuthenticated ? 'has-header' : '' %>" data-user-role="<%= userRole || '' %>">
+<body class="<%= isAuthenticated ? 'has-header' : '' %>">
 
   <% if (isAuthenticated && userRole==='admin' ) { %>
     <header id="header">
@@ -701,13 +701,13 @@
 
       <!-- Scripts -->
       <script src="/public/js/3d/cesium.js"></script>
-      <script src="/public/js/3d/navigation.js"></script>
       <script src="/public/js/3d/redline.js"></script>
       <script src="/public/js/3d/simulation.js"></script>
       <script>
         var altitudeOffset = 100; // Asigna el valor apropiado según tu lógica
         console.log('altitudeOffset:', altitudeOffset);
       </script>
+      <script src="/public/js/3d/heightmap-terrain-provider.js"></script>
       <script src="/public/js/3d/layers-config.js"></script>
       <script src="/public/js/3d/cesium-medir.js"></script>
       <script src="/public/js/3d/cesium-talk.js"></script>
@@ -834,6 +834,11 @@
         
         
               </script>
+
+      <script>
+        var userRole = "<%= userRole %>";
+      </script>
+
 
 </body>
 

@@ -5,7 +5,8 @@ const acceptFormats = {
   /* '2d': ['.jpeg', '.jpg', '.png', '.geotif', '.tiff'], */
   '3d': ['.gltf', '.glb', '.czml', '.kml', '.kmz'],
   '3Dtiles': ['.zip'],
-  'terrain': ['.zip']
+  'terrain': ['.zip'],
+  'dtm': ['.tif', '.tiff', '.geotif', '.geotiff']
 };
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -66,6 +67,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const lateralRotationInput = document.getElementById('lateralRotationInput');
   const uploadButton = document.getElementById('uploadButton');
   const tilesetSelect = document.getElementById('tilesetSelect');
+  const dtmOptions = document.getElementById('dtmOptions');
 
 
 
@@ -143,6 +145,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const uploadType = radio.value;
       const exts = acceptFormats[uploadType] || [];
       fileInput.accept = exts.join(',');
+      dtmOptions.hidden = uploadType !== 'dtm';
       // Limpiar vista previa
       previewContainer.innerHTML = '';
       fileInput.value = '';
@@ -198,7 +201,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     const formData = new FormData(this);
     const uploadType = document.querySelector('input[name="uploadType"]:checked').value;
-    formData.append('uploadType', uploadType);
+    formData.set('uploadType', uploadType);
 
     const uploadEndpoint = '/data/api/files'; // Siempre usaremos esta ruta
 
@@ -219,7 +222,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       })
       .then(result => {
         enableButtons();
-        if (result.message) {
+        const processingErrors = (result.unsupportedFiles || []).map(item => `${item.name}: ${item.error}`);
+        if (processingErrors.length > 0) {
+          showMessage(processingErrors.join(' | '), 'is-danger');
+        } else if (result.message) {
           showMessage(result.message, 'is-success');
           loadFiles(); // Recargar lista de archivos después de la carga
         } else {
@@ -238,7 +244,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   try {
     const config = await fetch('/3d/api/load-cesium-token').then(res => res.json());
     Cesium.Ion.defaultAccessToken = config.cesiumToken;
-    console.log('Cesium Ion token loaded.');
+    console.log('Cesium Ion token loaded:', Cesium.Ion.defaultAccessToken);
 
     // Cargar terrenos de Ion después de configurar el token
     await loadIonTerrains(config);
@@ -303,11 +309,7 @@ terrainSelect.addEventListener('change', async function () {
 
     if (terrainName) {
       try {
-        const terrainProvider = new Cesium.CesiumTerrainProvider({
-          url: `/terrain/${terrainName}/`, // Asegúrate de que termina con "/"
-          requestVertexNormals: true,
-          requestWaterMask: true,
-        });
+        const terrainProvider = await createLocalTerrainProvider(`/terrain/${terrainName}/`);
         cesiumViewer.scene.terrainProvider = terrainProvider;
         console.log(`Local Terrain loaded: /terrain/${terrainName}/`);
         showMessage(`Local Terrain "${terrainName}" loaded successfully.`, 'is-success');
@@ -407,6 +409,10 @@ terrainSelect.addEventListener('change', async function () {
 
   // Función para cargar los 3D Tiles locales en el dropdown
   function loadLocal3DTiles() {
+    if (!tilesetSelect) {
+      return;
+    }
+
     fetch('/data/api/getLocal3DTiles')
       .then(response => response.json())
       .then(tilesets => {
@@ -685,7 +691,7 @@ terrainSelect.addEventListener('change', async function () {
 
 
   // Función para ver archivos de Terreno
-  function viewTerrain(fileName) {
+  async function viewTerrain(fileName) {
     console.log("viewTerrain called with fileName:", fileName);
     closeModal();
     currentDataLink = null;
@@ -703,11 +709,7 @@ terrainSelect.addEventListener('change', async function () {
     console.log('terrainName:', terrainName);
 
     try {
-      const terrainProvider = new Cesium.CesiumTerrainProvider({
-        url: `/terrain/${terrainName}/`,
-        requestVertexNormals: true,
-        requestWaterMask: true,
-      });
+      const terrainProvider = await createLocalTerrainProvider(`/terrain/${terrainName}/`);
       cesiumViewer.scene.terrainProvider = terrainProvider;
       console.log(`Local Terrain loaded: /terrain/${terrainName}/`);
       showMessage(`Local Terrain "${terrainName}" loaded successfully.`, 'is-success');
@@ -1263,6 +1265,12 @@ terrainSelect.addEventListener('change', async function () {
       const viewButton = createButton('View', 'is-success');
       viewButton.onclick = () => viewTerrain(file.name);
       buttons.appendChild(viewButton);
+
+      if (file.regenerable) {
+        const regenerateButton = createButton('Regenerate heightmap', 'is-info');
+        regenerateButton.onclick = () => regenerateTerrain(file.name, regenerateButton);
+        buttons.appendChild(regenerateButton);
+      }
     }
 
     if (file.type === '3d') {
@@ -1297,6 +1305,26 @@ terrainSelect.addEventListener('change', async function () {
     button.className = `button ${className}`;
     button.textContent = text;
     return button;
+  }
+
+  async function regenerateTerrain(terrainName, button) {
+    button.disabled = true;
+    try {
+      const response = await fetch(`/data/api/terrains/${encodeURIComponent(terrainName)}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Terrain regeneration failed.');
+      }
+      showMessage(result.message, 'is-success');
+      loadFiles();
+    } catch (error) {
+      showMessage(error.message, 'is-danger');
+      button.disabled = false;
+    }
   }
 
   // Función para eliminar archivos

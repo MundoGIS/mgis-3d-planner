@@ -22,38 +22,6 @@ body {
     flex: 0 0 auto;
 }
 
-#customNavigation {
-    position: absolute;
-    right: 26px;
-    top: 24px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    background: rgba(25, 25, 25, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    padding: 8px;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.custom-nav-button {
-    width: 34px;
-    height: 34px;
-    border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 18px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.custom-nav-button:hover {
-    background: rgba(255, 255, 255, 0.18);
-}
-
 /* Layer widget styles */
 #layerWidget {
     position: absolute;

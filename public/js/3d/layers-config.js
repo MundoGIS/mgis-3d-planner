@@ -2,7 +2,6 @@ let currentConfigName = 'default'; // Default configuration name
 let selectedTerrain = null;
 //let loadedLayers = {}; // Store loaded layers
 let loadedTerrains = [];
-const userRole = document.body?.dataset?.userRole || '';
 
 document.addEventListener('DOMContentLoaded', function () {
   const reloadMapButton = document.getElementById('reloadMapButton');
@@ -19,11 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  if (window.cesiumViewer && window.cesiumViewer.imageryLayers) {
-    loadLayers();
-  } else {
-    window.addEventListener('cesium-viewer-ready', () => loadLayers(), { once: true });
-  }
+  loadLayers();
 });
 
 
@@ -535,6 +530,12 @@ function loadLayer(layer) {
     case 'wms':
       loadWmsLayer(layer);
       break;
+    case 'wmts':
+      loadWmtsLayer(layer);
+      break;
+    case 'xyz':
+      loadXyzLayer(layer);
+      break;
     case 'osm':  // Manejar el caso de OpenStreetMap
       loadOsmLayer(layer);
       break;
@@ -598,35 +599,107 @@ function loadOsmLayer(layer) {
   const osmLayer = new Cesium.OpenStreetMapImageryProvider();
 
   const imageryLayer = cesiumViewer.imageryLayers.addImageryProvider(osmLayer);
-  imageryLayer.show = layer.visible !== undefined ? layer.visible : true;  // Respetar visibilidad
-  loadedLayers[layer.name] = imageryLayer;  // Registrar la capa en loadedLayers
+  imageryLayer.show = layer.visible !== undefined ? layer.visible : true;
+  loadedLayers[layer.name] = {
+    cesiumObject: imageryLayer,
+    show: imageryLayer.show,
+    visible: imageryLayer.show,
+    type: layer.type,
+    isBaseLayer: Boolean(layer.isBaseLayer)
+  };
 
   console.log(`OSM layer ${layer.name} loaded with visibility: ${imageryLayer.show}`);
 }
 
 
+function imageryProxyUrl(remoteUrl) {
+  return `/3d/api/imagery-proxy?url=${encodeURIComponent(remoteUrl)}`;
+}
+
+function xyzProxyUrl(template) {
+  return imageryProxyUrl(template)
+    .replaceAll('%7Bz%7D', '{z}')
+    .replaceAll('%7Bx%7D', '{x}')
+    .replaceAll('%7By%7D', '{y}');
+}
+
+function addConfiguredImageryLayer(layer, provider) {
+  const imageryLayer = cesiumViewer.imageryLayers.addImageryProvider(provider);
+  imageryLayer.show = layer.visible !== undefined ? layer.visible : false;
+  loadedLayers[layer.name] = {
+    cesiumObject: imageryLayer,
+    show: imageryLayer.show,
+    visible: imageryLayer.show,
+    type: layer.type,
+    isBaseLayer: Boolean(layer.isBaseLayer)
+  };
+  return imageryLayer;
+}
+
+function createImageryTilingScheme(layer, fallback = 'webMercator') {
+  if ((layer.tilingScheme || fallback) === 'geographic') {
+    return new Cesium.GeographicTilingScheme({
+      numberOfLevelZeroTilesX: layer.levelZeroTilesX || 2,
+      numberOfLevelZeroTilesY: layer.levelZeroTilesY || 1
+    });
+  }
+  return new Cesium.WebMercatorTilingScheme({
+    numberOfLevelZeroTilesX: layer.levelZeroTilesX || 1,
+    numberOfLevelZeroTilesY: layer.levelZeroTilesY || 1
+  });
+}
+
 function loadWmsLayer(layer) {
   console.log("Loading WMS layer:", layer);
+  const isTransparentOverlay = !layer.isBaseLayer;
+  const version = layer.version || '1.3.0';
+  const parameters = {
+    service: 'WMS',
+    version,
+    request: 'GetMap',
+    styles: '',
+    format: isTransparentOverlay ? 'image/png' : (layer.format || 'image/png'),
+    transparent: isTransparentOverlay ? 'true' : 'false'
+  };
+  if (layer.crs) {
+    parameters[Number.parseFloat(version) >= 1.3 ? 'crs' : 'srs'] = layer.crs;
+  }
   const wmsLayer = new Cesium.WebMapServiceImageryProvider({
-    url: layer.url,
+    url: imageryProxyUrl(layer.url),
     layers: layer.layerName,
-    parameters: {
-      service: "WMS",
-      version: "1.1.1",
-      request: "GetMap",
-      styles: "",
-      format: "image/png",
-      transparent: true,
-    },
+    parameters,
+    tilingScheme: createImageryTilingScheme(layer, 'geographic')
   });
 
-  const imageryLayer = cesiumViewer.imageryLayers.addImageryProvider(wmsLayer);
-  imageryLayer.show = layer.visible !== undefined ? layer.visible : false;
-
-  // Guarda la capa en `loadedLayers` para referencia futura
-  loadedLayers[layer.name] = imageryLayer;
+  const imageryLayer = addConfiguredImageryLayer(layer, wmsLayer);
 
   console.log("WMS layer loaded:", layer.name, "with visibility:", imageryLayer.show);
+}
+
+function loadWmtsLayer(layer) {
+  console.log('Loading WMTS layer:', layer);
+  const provider = new Cesium.WebMapTileServiceImageryProvider({
+    url: imageryProxyUrl(layer.url),
+    layer: layer.layerName,
+    style: layer.style || 'default',
+    format: layer.format || 'image/png',
+    tileMatrixSetID: layer.tileMatrixSet,
+    tileMatrixLabels: layer.tileMatrixLabels,
+    maximumLevel: layer.maximumLevel,
+    tilingScheme: createImageryTilingScheme(layer)
+  });
+  addConfiguredImageryLayer(layer, provider);
+}
+
+function loadXyzLayer(layer) {
+  console.log('Loading XYZ layer:', layer);
+  const provider = new Cesium.UrlTemplateImageryProvider({
+    url: xyzProxyUrl(layer.url),
+    tilingScheme: new Cesium.WebMercatorTilingScheme(),
+    maximumLevel: layer.maximumLevel || 22,
+    credit: layer.credit || undefined
+  });
+  addConfiguredImageryLayer(layer, provider);
 }
 
 
@@ -943,35 +1016,30 @@ function zoomToLayer(layerName) {
 
 
 
-function deleteItem(itemName, itemType, itemKey) {
+async function deleteItem(itemName, itemType, itemKey) {
   if (!confirm(`¿Estás seguro de que deseas eliminar "${itemName}"?`)) {
     return;
   }
 
-  fetch('/3d/api/delete-item', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: itemName, type: itemType, key: itemKey }),
-  })
-    .then(response => response.json())
-    .then(data => {
-      if (data.message === 'Item deleted successfully') {
-        console.log(`Item "${itemName}" deleted successfully.`);
-
-        // Si era una capa, remuévela del mapa
-        if (itemType === 'layer') {
-          removeLayerFromMap(itemName);
-        }
-
-        // Recargar la lista en la interfaz
-        loadLayers();
-      } else {
-        console.error('Error deleting item:', data.error);
-      }
-    })
-    .catch(error => {
-      console.error('Error deleting item:', error);
+  try {
+    await visibilityUpdateQueue;
+    const response = await fetch('/3d/api/delete-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: itemName, type: itemType, key: itemKey }),
     });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Error deleting item');
+    }
+    if (itemType === 'layer') {
+      removeLayerFromMap(itemName);
+    }
+    await loadLayers();
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    alert(`Could not delete "${itemName}": ${error.message}`);
+  }
 }
 
 
@@ -1037,6 +1105,8 @@ async function addLayerDialog() {
                 <option value="gltf">GLTF</option>
                 <option value="glb">GLB</option>
                 <option value="wms">WMS</option>
+                <option value="wmts">WMTS</option>
+                <option value="xyz">XYZ tiles</option>
                 <option value="kml">KML</option>
                 <option value="czml">CZML</option>
                 <option value="3dtiles">Local 3D Tiles</option>
@@ -1059,17 +1129,17 @@ async function addLayerDialog() {
           </div>
         </div>
 
-        <!-- WMS URL -->
+        <!-- Map service URL -->
         <div class="field" id="wmsUrlField" style="display: none;">
-          <label class="label">Add the WMS URL</label>
+          <label class="label" id="imageryUrlLabel">Map service URL</label>
           <div class="control">
-            <input class="input" type="text" id="wmsUrlInput" placeholder="https://example.com/wms" required>
+            <input class="input" type="text" id="wmsUrlInput" placeholder="https://example.com/wms?project=my-project" required>
           </div>
         </div>
 
-        <!-- WMS Layer Selection -->
+        <!-- Service Layer Selection -->
         <div class="field" id="wmsLayerField" style="display: none;">
-          <label class="label">Select a WMS layer</label>
+          <label class="label" id="imageryLayerLabel">Select a service layer</label>
           <div class="control">
             <div class="select">
               <select id="wmsLayerSelect">
@@ -1082,7 +1152,7 @@ async function addLayerDialog() {
         <!-- Option to choose if it is a base layer -->
         <div class="field" id="wmsBaseLayerField" style="display: none;">
           <label class="checkbox">
-            <input type="checkbox" id="wmsIsBaseLayer"> Is this a base layer?
+            <input type="checkbox" id="wmsIsBaseLayer"> Use as background layer
           </label>
         </div>
 
@@ -1106,24 +1176,6 @@ async function addLayerDialog() {
               <select id="ionAssetsSelect">
                 <option value="">Loading Ion data...</option>
               </select>
-            </div>
-          </div>
-          <p class="help" id="ionAssetsHelp">If your token cannot list assets, enter the asset ID manually below.</p>
-          <div class="field" style="margin-top: 0.75rem;">
-            <label class="label">Manual Cesium Ion asset ID</label>
-            <div class="control">
-              <input class="input" type="text" id="ionAssetIdInput" placeholder="Example: 96188">
-            </div>
-          </div>
-          <div class="field">
-            <label class="label">Manual asset type</label>
-            <div class="control">
-              <div class="select">
-                <select id="ionAssetTypeSelect">
-                  <option value="3dtiles">3D Tiles</option>
-                  <option value="terrain">Terrain</option>
-                </select>
-              </div>
             </div>
           </div>
         </div>
@@ -1212,10 +1264,11 @@ async function addLayerDialog() {
   const wmsUrlInput = document.getElementById('wmsUrlInput');
   const wmsLayerSelect = document.getElementById('wmsLayerSelect');
   const wmsIsBaseLayer = document.getElementById('wmsIsBaseLayer');
+  const imageryUrlLabel = document.getElementById('imageryUrlLabel');
+  const imageryLayerLabel = document.getElementById('imageryLayerLabel');
   const ionAssetsSelect = document.getElementById('ionAssetsSelect');
-  const ionAssetIdInput = document.getElementById('ionAssetIdInput');
-  const ionAssetTypeSelect = document.getElementById('ionAssetTypeSelect');
   const gltfSelect = document.getElementById('gltfSelect');
+  let imageryCapabilities = null;
 
   // Limpia y oculta todos los campos
   function hideAllFields() {
@@ -1248,8 +1301,18 @@ async function addLayerDialog() {
         break;
 
       case 'wms':
+      case 'wmts':
+      case 'xyz':
         wmsUrlField.style.display = 'block';
         wmsBaseLayerField.style.display = 'block';
+        imageryUrlLabel.textContent = `${selectedType.toUpperCase()} URL`;
+        imageryLayerLabel.textContent = `Select a ${selectedType.toUpperCase()} layer`;
+        wmsUrlInput.placeholder = selectedType === 'xyz'
+          ? 'https://example.com/tiles/{z}/{x}/{y}.png'
+          : `https://example.com/${selectedType}?project=my-project`;
+        if (selectedType !== 'xyz' && wmsUrlInput.value.trim()) {
+          await loadImageryLayers(selectedType, wmsUrlInput.value.trim());
+        }
         break;
 
       case 'czml':
@@ -1351,25 +1414,39 @@ async function addLayerDialog() {
 
 
 
-  // Función para cargar capas WMS desde la URL usando GetCapabilities
-  async function loadWmsLayers(wmsUrl) {
+  async function loadImageryLayers(type, serviceUrl) {
     try {
-      const response = await fetch(`/3d/api/loadWmsLayers?url=${encodeURIComponent(wmsUrl)}`);
+      wmsLayerSelect.innerHTML = '<option value="">Loading layers...</option>';
+      wmsLayerField.style.display = 'block';
+      const response = await fetch(`/3d/api/imagery-capabilities?type=${type}&url=${encodeURIComponent(serviceUrl)}`);
       const data = await response.json();
-      wmsLayerSelect.innerHTML = data.map(layer => `<option value="${layer.name}">${layer.name}</option>`).join('');
-      wmsLayerField.style.display = 'block'; // Mostrar la selección de capas WMS
+      if (!response.ok) {
+        throw new Error(data.error || `Could not load ${type.toUpperCase()} capabilities.`);
+      }
+      imageryCapabilities = data;
+      wmsLayerSelect.innerHTML = '<option value="">Select a layer</option>';
+      data.layers.forEach(layer => {
+        const option = document.createElement('option');
+        option.value = layer.name;
+        option.textContent = layer.title ? `${layer.title} (${layer.name})` : layer.name;
+        option.dataset.details = JSON.stringify(layer);
+        wmsLayerSelect.appendChild(option);
+      });
     } catch (error) {
-      console.error('Error loading WMS layers:', error);
+      imageryCapabilities = null;
+      wmsLayerSelect.innerHTML = `<option value="">${error.message}</option>`;
+      console.error(`Error loading ${type.toUpperCase()} layers:`, error);
     }
   }
 
-  // Listener para cargar capas WMS cuando se ingresa la URL
-  wmsUrlInput.addEventListener('input', async () => {
-    const wmsUrl = wmsUrlInput.value.trim();
-    if (wmsUrl) {
-      await loadWmsLayers(wmsUrl); // Cargar las capas WMS desde la URL proporcionada
+  wmsUrlInput.addEventListener('change', async () => {
+    const serviceUrl = wmsUrlInput.value.trim();
+    const type = selectType.value;
+    if (serviceUrl && ['wms', 'wmts'].includes(type)) {
+      await loadImageryLayers(type, serviceUrl);
     } else {
-      wmsLayerSelect.innerHTML = `<option value="">-- Seleccione una URL WMS primero --</option>`;
+      imageryCapabilities = null;
+      wmsLayerSelect.innerHTML = '<option value="">Enter a service URL first</option>';
       wmsLayerField.style.display = 'none';
     }
   });
@@ -1462,14 +1539,8 @@ async function addLayerDialog() {
       const response = await fetch('/3d/api/proxy-ion-assets');
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.details?.message || data.error || 'Failed to load Cesium Ion assets.');
-      }
-
-      const items = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : [];
-
       // Filtra y muestra solo terrenos y 3D Tiles
-      const combinedAssets = items.filter(
+      const combinedAssets = data.items.filter(
         asset => asset.type === 'TERRAIN' || asset.type === '3DTILES'
       );
 
@@ -1485,21 +1556,11 @@ async function addLayerDialog() {
           )
           .join('');
         ionAssetsSelect.parentElement.style.display = 'block'; // Muestra el dropdown
-        if (ionAssetIdInput) {
-          ionAssetIdInput.value = '';
-        }
       } else {
         ionAssetsSelect.innerHTML = `<option value="">No assets found</option>`;
       }
     } catch (error) {
       console.error('Error loading Cesium Ion files:', error);
-      const ionAssetsSelect = document.getElementById('ionAssetsSelect');
-      if (ionAssetsSelect) {
-        ionAssetsSelect.innerHTML = `<option value="">${error.message || 'Unable to load Cesium Ion assets'}</option>`;
-      }
-      if (ionAssetIdInput) {
-        ionAssetIdInput.focus();
-      }
     }
   }
 
@@ -1517,11 +1578,8 @@ async function addLayerDialog() {
     const type = document.getElementById("selectType").value;
     const name = document.getElementById("nameInput").value.trim();
 
-    const listedIonAssetId = ionAssetsSelect?.value;
-    const listedAssetType = ionAssetsSelect?.selectedOptions[0]?.getAttribute("data-type");
-    const manualIonAssetId = ionAssetIdInput?.value.trim();
-    const ionAssetId = manualIonAssetId || listedIonAssetId;
-    const assetType = manualIonAssetId ? ionAssetTypeSelect?.value : listedAssetType;
+    const ionAssetId = ionAssetsSelect?.value;
+    const assetType = ionAssetsSelect?.selectedOptions[0]?.getAttribute("data-type");
     const tilesetName = tilesSelect?.value;
     const gltfName = gltfSelect?.value;
     const glbName = document.getElementById("glbSelect")?.value;  // <-- Agregado para GLB
@@ -1540,7 +1598,7 @@ async function addLayerDialog() {
         // ------------------------------------------------------
         case "ion":
           if (!ionAssetId || !assetType) {
-            alert("Please choose a valid Ion asset or enter a manual asset ID.");
+            alert("Please choose a valid Ion asset and name.");
             return;
           }
           if (assetType === "terrain") {
@@ -1656,12 +1714,75 @@ async function addLayerDialog() {
             alert("Please fill WMS URL and layer name.");
             return;
           }
+          const wmsDetails = JSON.parse(wmsLayerSelect.selectedOptions[0].dataset.details || '{}');
+          const advertisedCrs = wmsDetails.crs || [];
+          const selectedCrs = advertisedCrs.find(crs => /^CRS:84$/i.test(crs))
+            || advertisedCrs.find(crs => /(?:^|:)4326$/i.test(crs))
+            || advertisedCrs.find(crs => /(?:3857|900913)$/i.test(crs));
+          if (!selectedCrs) {
+            alert(`This WMS layer does not advertise a Cesium-compatible CRS. Available CRS: ${advertisedCrs.join(', ') || 'none'}`);
+            return;
+          }
           layerConfig = {
             name,
             type: "wms",
-            url: wmsUrl,
+            url: imageryCapabilities?.serviceUrl || wmsUrl,
             layerName: wmsLayer,
-            isBaseLayer
+            version: imageryCapabilities?.version || '1.3.0',
+            format: 'image/png',
+            crs: selectedCrs,
+            tilingScheme: /3857|900913/i.test(selectedCrs) ? 'webMercator' : 'geographic',
+            transparent: !isBaseLayer,
+            isBaseLayer,
+            visible: false
+          };
+          await saveLayer(layerConfig);
+          break;
+
+        case "wmts": {
+          if (!wmsUrl || !wmsLayer || !imageryCapabilities) {
+            alert("Please enter a WMTS URL and select a layer.");
+            return;
+          }
+          const details = JSON.parse(wmsLayerSelect.selectedOptions[0].dataset.details || '{}');
+          const matrixSet = details.matrixSets?.find(item => item.tilingScheme === 'webMercator')
+            || details.matrixSets?.find(item => item.tilingScheme === 'geographic');
+          if (!matrixSet) {
+            const availableCrs = details.matrixSets?.map(item => item.supportedCrs).join(', ') || 'none';
+            alert(`This WMTS layer has no Cesium-compatible matrix (EPSG:3857 or EPSG:4326/CRS84). Available CRS: ${availableCrs}`);
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "wmts",
+            url: imageryCapabilities.serviceUrl,
+            layerName: wmsLayer,
+            style: details.style || 'default',
+            format: details.formats?.includes('image/png') ? 'image/png' : details.formats?.[0],
+            tileMatrixSet: matrixSet.identifier,
+            tileMatrixLabels: matrixSet.tileMatrixLabels,
+            tilingScheme: matrixSet.tilingScheme,
+            levelZeroTilesX: matrixSet.levelZeroTilesX,
+            levelZeroTilesY: matrixSet.levelZeroTilesY,
+            maximumLevel: matrixSet.maximumLevel,
+            isBaseLayer,
+            visible: false
+          };
+          await saveLayer(layerConfig);
+          break;
+        }
+
+        case "xyz":
+          if (!wmsUrl || !wmsUrl.includes('{z}') || !wmsUrl.includes('{x}') || !wmsUrl.includes('{y}')) {
+            alert("XYZ URL must contain {z}, {x}, and {y}.");
+            return;
+          }
+          layerConfig = {
+            name,
+            type: "xyz",
+            url: wmsUrl,
+            isBaseLayer,
+            visible: false
           };
           await saveLayer(layerConfig);
           break;
@@ -1810,7 +1931,7 @@ async function selectTerrain(urlOrType) {
         terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(assetId);
         console.log(`Cesium Ion terrain selected with asset ID: ${assetId}`);
       } else {
-        terrainProvider = new Cesium.CesiumTerrainProvider({ url: urlOrType });
+        terrainProvider = await createLocalTerrainProvider(urlOrType);
         console.log(`Local terrain selected with URL: ${urlOrType}`);
       }
     }

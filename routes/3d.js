@@ -3,39 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const axios = require('axios');
+const { DOMParser } = require('@xmldom/xmldom'); // Usar xmldom para analizar XML
 //const { Blob } = require('buffer'); // Asegúrate de usar Blob para manejar archivos binarios si es necesario
-
-const envFilePath = path.join(__dirname, '..', '.env');
-
-
-function getCesiumIonToken(config) {
-  return process.env.CESIUM_ION_TOKEN || config?.cesiumToken || null;
-}
-
-async function writeEnvVariable(name, value) {
-  const normalizedValue = value ?? '';
-  let envContent = '';
-
-  try {
-    envContent = await fs.promises.readFile(envFilePath, 'utf8');
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
-
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const variablePattern = new RegExp(`^${escapedName}=.*$`, 'm');
-  const nextLine = `${name}=${normalizedValue}`;
-
-  if (variablePattern.test(envContent)) {
-    envContent = envContent.replace(variablePattern, nextLine);
-  } else {
-    envContent = `${envContent.trimEnd()}${envContent ? '\n' : ''}${nextLine}\n`;
-  }
-
-  await fs.promises.writeFile(envFilePath, envContent, 'utf8');
-}
 
 
 // Define la ruta global para la configuración de JSONs
@@ -47,6 +16,171 @@ const gltfDir = path.join(__dirname, '..', 'data', 'uploaded', '3d');
 // Ruta al archivo donde guardaremos las URLs WMS
 const wmsUrlsFilePath = path.join(__dirname, '..', 'data', '3d-jsons', 'wms-urls.json');
 const modelsFilePath = path.join(configDir, '3d-modells.json'); 
+const configMutationQueues = new Map();
+
+
+class ConfigMutationError extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function mutateConfig(filePath, mutator) {
+  const previousMutation = configMutationQueues.get(filePath) || Promise.resolve();
+  const mutation = previousMutation.catch(() => undefined).then(async () => {
+    const data = await fs.promises.readFile(filePath, 'utf8');
+    const config = JSON.parse(data);
+    const result = await mutator(config);
+    const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+
+    try {
+      await fs.promises.writeFile(temporaryPath, JSON.stringify(config, null, 2), 'utf8');
+      await fs.promises.rename(temporaryPath, filePath);
+    } finally {
+      await fs.promises.rm(temporaryPath, { force: true });
+    }
+    return result;
+  });
+
+  configMutationQueues.set(filePath, mutation);
+  mutation.finally(() => {
+    if (configMutationQueues.get(filePath) === mutation) {
+      configMutationQueues.delete(filePath);
+    }
+  }).catch(() => undefined);
+  return mutation;
+}
+
+
+function parseHttpUrl(value) {
+  const parsed = new URL(value);
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only HTTP and HTTPS service URLs are supported.');
+  }
+  return parsed;
+}
+
+function directChildText(node, localName) {
+  if (!node) {
+    return '';
+  }
+  const child = Array.from(node.childNodes || []).find(item => item.nodeType === 1 && item.localName === localName);
+  return child ? child.textContent.trim() : '';
+}
+
+function descendantTexts(node, localName) {
+  return Array.from(node.getElementsByTagNameNS('*', localName))
+    .map(item => item.textContent.trim())
+    .filter(Boolean);
+}
+
+function inheritedWmsCrs(layer) {
+  const values = new Set();
+  let current = layer;
+  while (current?.nodeType === 1 && current.localName === 'Layer') {
+    for (const child of Array.from(current.childNodes || [])) {
+      if (child.nodeType === 1 && ['CRS', 'SRS'].includes(child.localName)) {
+        const value = child.textContent.trim();
+        if (value) values.add(value);
+      }
+    }
+    current = current.parentNode;
+  }
+  return [...values];
+}
+
+function serviceUrl(value) {
+  const parsed = parseHttpUrl(value);
+  const serviceParameters = new Set(['service', 'request', 'version', 'layer', 'layers']);
+  for (const name of [...parsed.searchParams.keys()]) {
+    if (serviceParameters.has(name.toLowerCase())) {
+      parsed.searchParams.delete(name);
+    }
+  }
+  return parsed.toString();
+}
+
+async function fetchCapabilities(type, value) {
+  const url = parseHttpUrl(value);
+  for (const name of [...url.searchParams.keys()]) {
+    if (['service', 'request', 'version'].includes(name.toLowerCase())) {
+      url.searchParams.delete(name);
+    }
+  }
+  url.searchParams.set('SERVICE', type.toUpperCase());
+  url.searchParams.set('REQUEST', 'GetCapabilities');
+
+  const response = await axios.get(url.toString(), {
+    timeout: 15000,
+    responseType: 'text',
+    headers: { Accept: 'application/xml,text/xml,*/*' }
+  });
+  const xmlDoc = new DOMParser().parseFromString(response.data, 'text/xml');
+  const parserError = xmlDoc.getElementsByTagName('parsererror')[0];
+  if (parserError) {
+    throw new Error('The service returned invalid XML capabilities.');
+  }
+
+  if (type === 'wms') {
+    const root = xmlDoc.documentElement;
+    const formats = descendantTexts(xmlDoc, 'GetMap').length
+      ? descendantTexts(xmlDoc.getElementsByTagNameNS('*', 'GetMap')[0], 'Format')
+      : ['image/png'];
+    const layers = Array.from(xmlDoc.getElementsByTagNameNS('*', 'Layer'))
+      .map(layer => ({
+        name: directChildText(layer, 'Name'),
+        title: directChildText(layer, 'Title'),
+        crs: inheritedWmsCrs(layer)
+      }))
+      .filter(layer => layer.name);
+    return { type, serviceUrl: serviceUrl(value), version: root.getAttribute('version') || '1.3.0', formats, layers };
+  }
+
+  const matrixSets = Object.fromEntries(
+    Array.from(xmlDoc.getElementsByTagNameNS('*', 'TileMatrixSet')).map(matrixSet => {
+      const identifier = directChildText(matrixSet, 'Identifier');
+      const tileMatrices = Array.from(matrixSet.childNodes || [])
+        .filter(item => item.nodeType === 1 && item.localName === 'TileMatrix');
+      if (!identifier || tileMatrices.length === 0) {
+        return null;
+      }
+      const supportedCrs = directChildText(matrixSet, 'SupportedCRS');
+      const crsDescription = `${identifier} ${supportedCrs}`;
+      let tilingScheme = null;
+      if (/3857|900913|GoogleMapsCompatible/i.test(crsDescription)) {
+        tilingScheme = 'webMercator';
+      } else if (/4326|CRS84|WorldCRS84Quad/i.test(crsDescription)) {
+        tilingScheme = 'geographic';
+      }
+      const firstMatrix = tileMatrices[0];
+      return [identifier, {
+        identifier,
+        supportedCrs,
+        tilingScheme,
+        tileMatrixLabels: tileMatrices.map(tileMatrix => directChildText(tileMatrix, 'Identifier')),
+        levelZeroTilesX: Number.parseInt(directChildText(firstMatrix, 'MatrixWidth'), 10) || undefined,
+        levelZeroTilesY: Number.parseInt(directChildText(firstMatrix, 'MatrixHeight'), 10) || undefined,
+        maximumLevel: Math.max(0, tileMatrices.length - 1)
+      }];
+    }).filter(Boolean)
+  );
+  const layers = Array.from(xmlDoc.getElementsByTagNameNS('*', 'Layer')).map(layer => {
+    const styleNode = Array.from(layer.getElementsByTagNameNS('*', 'Style'))
+      .find(style => style.getAttribute('isDefault') === 'true') || layer.getElementsByTagNameNS('*', 'Style')[0];
+    const matrixSetIds = Array.from(layer.getElementsByTagNameNS('*', 'TileMatrixSetLink'))
+      .map(link => directChildText(link, 'TileMatrixSet'))
+      .filter(Boolean);
+    return {
+      name: directChildText(layer, 'Identifier'),
+      title: directChildText(layer, 'Title'),
+      formats: descendantTexts(layer, 'Format'),
+      style: styleNode ? directChildText(styleNode, 'Identifier') : 'default',
+      matrixSets: matrixSetIds.map(identifier => matrixSets[identifier]).filter(Boolean)
+    };
+  }).filter(layer => layer.name);
+  return { type, serviceUrl: serviceUrl(value), version: '1.0.0', layers };
+}
 
 
 // Middleware para verificar autenticación
@@ -146,64 +280,20 @@ router.post('/api/update-layer-visibility', async (req, res) => {
     // 2) Normalizar configName
     const configName = config || 'default';
     const filePath = path.join(configDir, `${configName}.json`);
-
-    // 3) Leer el archivo
-    let data;
-    try {
-      data = await fs.promises.readFile(filePath, 'utf8');
-    } catch (readError) {
-      console.error('Error leyendo el archivo de configuración:', readError);
-      return res.status(500).json({ error: 'Error leyendo el archivo de configuración' });
-    }
-
-    // 4) Parsear el JSON
-    let configData;
-    try {
-      configData = JSON.parse(data);
-    } catch (parseError) {
-      console.error('Error parseando el JSON:', parseError);
-      return res.status(500).json({ error: 'Error parseando el JSON' });
-    }
-
-    // 5) Validar estructura mínima
-    if (!configData.config || !Array.isArray(configData.config.layers)) {
-      return res.status(400).json({
-        error: 'Formato de configuración inválido: falta config o config.layers'
-      });
-    }
-
-    // 6) Encontrar la capa por 'name'
-    const layer = configData.config.layers.find(layer => layer.name === name);
-    if (!layer) {
-      return res.status(404).json({ error: `Layer "${name}" not found in the config.` });
-    }
-
-    // 7) Convertir 'visible' a boolean si viene en string
-    //    Este patrón es útil si tu frontend envía "true"/"false" como string.
-    const parsedVisible = (visible === 'true' || visible === true);
-
-    // 8) Actualizar la visibilidad en la capa
-    layer.visible = parsedVisible;
-
-    console.log('Guardando configData:', JSON.stringify(configData, null, 2));
-
-    // 9) Guardar de nuevo el archivo
-    try {
-      await fs.promises.writeFile(
-        filePath,
-        JSON.stringify(configData, null, 2),
-        { encoding: 'utf8', flag: 'w' }
-      );
-    } catch (writeError) {
-      console.error('Error writing the configuration file:', writeError);
-      return res.status(500).json({ error: 'Error writing the configuration file' });
-    }
-
-    // 10) Responder con éxito
+    await mutateConfig(filePath, configData => {
+      if (!configData.config || !Array.isArray(configData.config.layers)) {
+        throw new ConfigMutationError('Invalid configuration: config.layers is missing.');
+      }
+      const layer = configData.config.layers.find(item => item.name === name);
+      if (!layer) {
+        throw new ConfigMutationError(`Layer "${name}" not found in the config.`, 404);
+      }
+      layer.visible = visible === 'true' || visible === true;
+    });
     return res.status(200).json({ message: 'Layer visibility updated successfully' });
   } catch (error) {
     console.error('Unexpected error updating layer visibility:', error);
-    return res.status(500).json({ error: 'Unexpected error updating layer visibility.' });
+    return res.status(error.status || 500).json({ error: error.message || 'Unexpected error updating layer visibility.' });
   }
 });
 
@@ -420,7 +510,7 @@ router.get('/api/load-ion-token', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    const token = getCesiumIonToken(config);
+    const token = config.cesiumToken; // Ajuste realizado aquí
 
     if (!token) {
       return res.json({ token: null });
@@ -434,7 +524,7 @@ router.get('/api/load-ion-token', async (req, res) => {
 });
 
 router.post('/api/save-ion-token', async (req, res) => {
-  const token = typeof req.body.token === 'string' ? req.body.token.trim() : '';
+  const { token } = req.body;
   const configName = 'default';
   const filePath = path.join(configDir, `${configName}.json`);
 
@@ -442,12 +532,10 @@ router.post('/api/save-ion-token', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    await writeEnvVariable('CESIUM_ION_TOKEN', token);
-    process.env.CESIUM_ION_TOKEN = token;
-    config.cesiumToken = '';
+    config.cesiumToken = token; // Ajuste realizado aquí
 
     await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
-    res.json({ message: 'Token saved successfully in .env' });
+    res.json({ message: 'Token saved successfully' });
   } catch (error) {
     console.error('Error saving Cesium Ion token:', error.message);
     res.status(500).json({ error: 'Error saving Cesium Ion token' });
@@ -464,7 +552,7 @@ router.get('/api/proxy-ion-assets', async (req, res) => {
     let data = await fs.promises.readFile(filePath, 'utf8');
     let config = JSON.parse(data);
 
-    const token = getCesiumIonToken(config);
+    const token = config.cesiumToken; // Asegúrate de que el token esté en la raíz de config
 
     if (!token) {
       return res.status(400).json({ error: 'Cesium Ion token not found' });
@@ -474,29 +562,14 @@ router.get('/api/proxy-ion-assets', async (req, res) => {
     const response = await axios.get('https://api.cesium.com/v1/assets', {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
       },
     });
 
     // Enviar la respuesta de vuelta al cliente
     res.status(200).json(response.data);
   } catch (error) {
-    const statusCode = error.response?.status || 500;
-    const details = error.response?.data || error.message;
-    const detailMessage = typeof details === 'string'
-      ? details
-      : details?.message || error.message;
-
-    let clientMessage = 'Error fetching Cesium Ion assets';
-    if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
-      clientMessage = 'Your Cesium Ion token can load assets by id, but listing account assets requires a token with assets:list or assets:limited-list scope.';
-    }
-
-    console.error('Error fetching Cesium Ion assets:', details);
-    res.status(statusCode).json({
-      error: clientMessage,
-      details: detailMessage
-    });
+    console.error('Error fetching Cesium Ion assets:', error.message);
+    res.status(500).json({ error: 'Error fetching Cesium Ion assets' });
   }
 });
 
@@ -509,24 +582,16 @@ router.post('/api/update-terrain-visibility', async (req, res) => {
 
   try {
     const filePath = path.join(configDir, 'default.json');
-    const data = await fs.promises.readFile(filePath, 'utf8');
-    const config = JSON.parse(data);
-
-    // Inicializar la lista de terrenos si no existe
-    config.config.terrains = config.config.terrains || [];
-
-    // Marcar todos los terrenos como no visibles excepto el seleccionado
-    config.config.terrains.forEach(terrain => {
-      terrain.visible = terrain.url === url;
+    await mutateConfig(filePath, config => {
+      config.config.terrains = config.config.terrains || [];
+      config.config.terrains.forEach(terrain => {
+        terrain.visible = terrain.url === url;
+      });
     });
-
-    // Guardar la configuración actualizada
-    await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
-
     res.json({ message: 'Selected terrain saved successfully.' });
   } catch (error) {
     console.error('Error updating terrain visibility:', error);
-    res.status(500).json({ error: 'Error updating terrain visibility' });
+    res.status(error.status || 500).json({ error: error.message || 'Error updating terrain visibility' });
   }
 });
 
@@ -582,67 +647,38 @@ router.post('/api/delete-item', async (req, res) => {
   const filePath = path.join(configDir, `${configName}.json`);
 
   try {
-    let data = await fs.promises.readFile(filePath, 'utf8');
-    let config = JSON.parse(data);
-
-    // Validamos que exista la sección .layers y .terrains
-    config.config.layers = config.config.layers || [];
-    config.config.terrains = config.config.terrains || [];
-
-    // Lógica para capa
     if (type === 'layer') {
       if (!key) {
         console.log('Error: Layer key is missing');
         return res.status(400).json({ error: 'Layer key is missing' });
       }
-
-      const layersBefore = config.config.layers.length;
-      console.log(`Number of layers before deletion: ${layersBefore}`);
-
-      // Filtrar capas que NO coincidan con el key a eliminar
-      config.config.layers = config.config.layers.filter(
-        layer => layer.key && layer.key.toString() !== key.toString()
-      );
-
-      const layersAfter = config.config.layers.length;
-      console.log(`Number of layers after deletion: ${layersAfter}`);
-
-      if (layersBefore === layersAfter) {
-        console.log('Error: Layer not found');
-        return res.status(404).json({ error: 'Layer not found' });
-      }
-
-      // Guardar cambios
-      await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
+      await mutateConfig(filePath, config => {
+        config.config.layers = config.config.layers || [];
+        const layersBefore = config.config.layers.length;
+        config.config.layers = config.config.layers.filter(
+          layer => layer.key && layer.key.toString() !== key.toString()
+        );
+        if (layersBefore === config.config.layers.length) {
+          throw new ConfigMutationError('Layer not found', 404);
+        }
+      });
       console.log('Layer deleted successfully');
       return res.status(200).json({ message: 'Item deleted successfully' });
     }
 
-    // Lógica para terreno
     if (type === 'terrain') {
       if (!name) {
         console.log('Error: Terrain name is missing');
         return res.status(400).json({ error: 'Terrain name is missing' });
       }
-
-      const terrainsBefore = config.config.terrains.length;
-      console.log(`Number of terrains before deletion: ${terrainsBefore}`);
-
-      // Filtrar terrenos que NO coincidan con el nombre a eliminar
-      config.config.terrains = config.config.terrains.filter(
-        terrain => terrain.name !== name
-      );
-
-      const terrainsAfter = config.config.terrains.length;
-      console.log(`Number of terrains after deletion: ${terrainsAfter}`);
-
-      if (terrainsBefore === terrainsAfter) {
-        console.log('Error: Terrain not found');
-        return res.status(404).json({ error: 'Terrain not found' });
-      }
-
-      // Guardar cambios
-      await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
+      await mutateConfig(filePath, config => {
+        config.config.terrains = config.config.terrains || [];
+        const terrainsBefore = config.config.terrains.length;
+        config.config.terrains = config.config.terrains.filter(terrain => terrain.name !== name);
+        if (terrainsBefore === config.config.terrains.length) {
+          throw new ConfigMutationError('Terrain not found', 404);
+        }
+      });
       console.log('Terrain deleted successfully');
       return res.status(200).json({ message: 'Item deleted successfully' });
     }
@@ -652,7 +688,7 @@ router.post('/api/delete-item', async (req, res) => {
 
   } catch (error) {
     console.error('Error deleting item:', error);
-    res.status(500).json({ error: 'Error deleting item' });
+    res.status(error.status || 500).json({ error: error.message || 'Error deleting item' });
   }
 });
 
@@ -662,25 +698,15 @@ router.post('/api/save-layer', async (req, res) => {
   try {
     const newLayer = req.body; // un objeto con { name, type, url, ... }
     const filePath = path.join(__dirname, '..', 'data', '3d-jsons', 'default.json');
-
-    // 1) Leer config
-    const data = await fs.promises.readFile(filePath, 'utf8');
-    const config = JSON.parse(data);
-
-    // 2) Asignar una key única
     newLayer.key = Date.now();
-
-    // 3) Agregarla a la lista de capas
-    config.config.layers.push(newLayer);
-
-    // 4) Guardar en disco
-    await fs.promises.writeFile(filePath, JSON.stringify(config, null, 2), 'utf8');
-
-    // 5) Responder
+    await mutateConfig(filePath, config => {
+      config.config.layers = config.config.layers || [];
+      config.config.layers.push(newLayer);
+    });
     res.json({ message: 'Layer added successfully', layerId: newLayer.key });
   } catch (error) {
     console.error('Error saving layer:', error);
-    res.status(500).json({ message: 'Error saving layer' });
+    res.status(error.status || 500).json({ message: error.message || 'Error saving layer' });
   }
 });
 
@@ -697,14 +723,66 @@ router.get('/api/loadWmsLayers', async (req, res) => {
       throw new Error('Failed to fetch WMS layers');
     }
 
-    const layers = Array.from(response.data.matchAll(/<Name>([^<]+)<\/Name>/g)).map(match => ({
-      name: match[1]
+    const xmlDoc = new DOMParser().parseFromString(response.data, 'text/xml');
+    const layers = Array.from(xmlDoc.getElementsByTagName('Name')).map(layer => ({
+      name: layer.textContent
     }));
 
     res.json(layers);
   } catch (error) {
     console.error('Error loading WMS layers:', error.message);
     res.status(500).json({ error: 'Error loading WMS layers' });
+  }
+});
+
+router.get('/api/imagery-capabilities', async (req, res) => {
+  const type = String(req.query.type || '').toLowerCase();
+  const url = req.query.url;
+  if (!['wms', 'wmts'].includes(type) || !url) {
+    return res.status(400).json({ error: 'A valid WMS/WMTS type and URL are required.' });
+  }
+
+  try {
+    res.json(await fetchCapabilities(type, url));
+  } catch (error) {
+    console.error(`Error loading ${type.toUpperCase()} capabilities:`, error.message);
+    res.status(502).json({ error: error.message || `Could not read ${type.toUpperCase()} capabilities.` });
+  }
+});
+
+router.get('/api/imagery-proxy', async (req, res) => {
+  try {
+    const target = parseHttpUrl(req.query.url);
+    for (const [name, value] of Object.entries(req.query)) {
+      if (name !== 'url' && typeof value === 'string') {
+        for (const existingName of [...target.searchParams.keys()]) {
+          if (existingName.toLowerCase() === name.toLowerCase()) {
+            target.searchParams.delete(existingName);
+          }
+        }
+        target.searchParams.set(name, value);
+      }
+    }
+
+    const isWms13 = target.searchParams.get('service')?.toUpperCase() === 'WMS'
+      && Number.parseFloat(target.searchParams.get('version')) >= 1.3;
+    const usesEpsg4326 = target.searchParams.get('crs')?.toUpperCase() === 'EPSG:4326';
+    const bbox = target.searchParams.get('bbox')?.split(',').map(Number);
+    if (isWms13 && usesEpsg4326 && bbox?.length === 4 && bbox.every(Number.isFinite)) {
+      target.searchParams.set('bbox', [bbox[1], bbox[0], bbox[3], bbox[2]].join(','));
+    }
+
+    const response = await axios.get(target.toString(), {
+      timeout: 30000,
+      responseType: 'arraybuffer',
+      validateStatus: status => status >= 200 && status < 300
+    });
+    res.set('Content-Type', response.headers['content-type'] || 'image/png');
+    res.set('Cache-Control', response.headers['cache-control'] || 'public, max-age=3600');
+    res.send(Buffer.from(response.data));
+  } catch (error) {
+    console.error('Imagery proxy error:', error.message);
+    res.status(error.response?.status || 502).json({ error: 'Could not retrieve the remote map image.' });
   }
 });
 
@@ -772,7 +850,7 @@ router.get('/api/load-cesium-token', (req, res) => {
     
     try {
       const config = JSON.parse(data);
-      res.json({ cesiumToken: getCesiumIonToken(config) });
+      res.json({ cesiumToken: config.cesiumToken });
     } catch (parseError) {
       console.error('Error parsing config file:', parseError);
       res.status(500).json({ error: 'Error parsing config file' });

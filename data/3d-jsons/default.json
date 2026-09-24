@@ -1,7 +1,7 @@
 {
   "id": "f64c2666-2d94-4b0e-88c9-601098ff8e18",
   "name": "default",
-  "cesiumToken": "",
+  "cesiumToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjMTc0Y2RkNC02OWUzLTQ4YWUtOTljMy0wODE2MjFjZWFlODAiLCJpZCI6MjA1NzYwLCJpYXQiOjE3MjY2NjI3NDN9.7peKXxWxAzT9kbzBj1FBlPhlfhA6NnwHNXj0vGXhpXE",
   "config": {
     "layers": [
       {
@@ -9,10 +9,50 @@
         "type": "osm",
         "isBaseLayer": true,
         "key": 1726655123501,
+        "visible": false
+      },
+      {
+        "name": "OSM buildings",
+        "type": "3dtiles",
+        "id": "96188",
+        "url": "https://assets.cesium.com/96188/tileset.json",
+        "key": 1746385489068,
         "visible": true
+      },
+      {
+        "name": "Googles",
+        "type": "3dtiles",
+        "id": "2275207",
+        "url": "https://assets.cesium.com/2275207/tileset.json",
+        "key": 1746388574090,
+        "visible": false
+      },
+      {
+        "name": "Roads",
+        "type": "xyz",
+        "url": "https://karta.rabbalshedekraft.se/wmts/googles/Google%20Road/{z}/{x}/{y}.png",
+        "isBaseLayer": true,
+        "visible": false,
+        "key": 1790247101981
+      },
+      {
+        "name": "Hybrid",
+        "type": "xyz",
+        "url": "https://karta.rabbalshedekraft.se/wmts/googles/Google%20Hybrid/{z}/{x}/{y}.png",
+        "isBaseLayer": true,
+        "visible": true,
+        "key": 1790247426939
       }
     ],
-    "terrains": []
+    "terrains": [
+      {
+        "key": "1746384979421",
+        "name": "Cesium world terrain",
+        "url": "https://assets.cesium.com/1/tileset.json",
+        "type": "ion",
+        "visible": true
+      }
+    ]
   },
   "savedViews": [
     {
@@ -26,6 +66,19 @@
         "heading": 0.0635643237924457,
         "pitch": -1.5701877114899814,
         "roll": 0
+      }
+    },
+    {
+      "name": "mina träd",
+      "position": [
+        2706447.9179162066,
+        737397.4490036604,
+        5709417.943422766
+      ],
+      "orientation": {
+        "heading": 4.835288474282816,
+        "pitch": 0.04221856258568413,
+        "roll": 0.000006148114858994802
       }
     }
   ]

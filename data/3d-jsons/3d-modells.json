@@ -1,4 +1,520 @@
 {
   "selectedTerrain": "cesiumIon",
-  "drawings": {}
+  "drawings": {
+    "träd": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22928630591451,
+              63.986305764752274,
+              381.5265042068137
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.229746300187657,
+              63.98646769543172,
+              380.10386795397454
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22979425957944,
+              63.986708303733685,
+              380.28226695438525
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.229320424079868,
+              63.986921612796685,
+              382.96254143035634
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228858486241414,
+              63.987206118804885,
+              385.319049867807
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22613193892465,
+              63.98781449460653,
+              385.5343841766916
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22404713847894,
+              63.98893555662712,
+              376.60007789750864
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22643020787219,
+              63.98850386554443,
+              379.4399273387578
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.227412272338613,
+              63.988020215340775,
+              383.36016465991537
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228411975875467,
+              63.98762207834743,
+              385.0443584295405
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22907030785139,
+              63.98743762164577,
+              383.3024237793512
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.229579462855286,
+              63.98718906651491,
+              381.0139388872918
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.229922485304055,
+              63.986921590740074,
+              379.4052965202541
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.23007944727812,
+              63.9867476457455,
+              378.1147369363898
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.23030544033266,
+              63.98647218029404,
+              377.04985336051755
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.230113879176592,
+              63.98636590053948,
+              377.0356493549902
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.229968132286245,
+              63.986226434286706,
+              376.9760221453112
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.230603042957293,
+              63.98620847067838,
+              374.33006295047335
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.23120583527634,
+              63.98638473134368,
+              372.7271563963362
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.231357715996658,
+              63.98679683298431,
+              372.62920974932155
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.230871477590984,
+              63.987240741986035,
+              375.1803701749245
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.230054470427318,
+              63.9875799291063,
+              378.54673239512607
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228795963402474,
+              63.98801952796393,
+              380.9700721542885
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22808513079919,
+              63.98836783028092,
+              378.98215479476943
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.22563797276967,
+              63.98613390757413,
+              390.6347629894893
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.226768129697607,
+              63.98610696656288,
+              389.97802150772964
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.227550250374156,
+              63.98638117188401,
+              387.5895448437565
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228010974599357,
+              63.986807331467254,
+              388.6359633646209
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228009576126931,
+              63.987143809366486,
+              388.1487075852893
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        },
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Model",
+            "coordinates": [
+              15.228341733415782,
+              63.98758628291021,
+              386.522772881452
+            ]
+          },
+          "properties": {
+            "gltfModelUrl": "/3d/pine_tree_10m.gltf",
+            "scale": 1,
+            "minimumPixelSize": 0,
+            "maximumScale": 1
+          }
+        }
+      ]
+    }
+  }
 }
