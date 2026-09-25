@@ -181,12 +181,12 @@ const tredDir = path.join(__dirname, '..', 'data', 'uploaded', '3d');
 const terrainDir = path.join(__dirname, '..', 'data', 'uploaded', '3d', 'terrain');
 //const twodDir = path.join(__dirname, '..', 'data', 'uploaded', '2d');
 
-router.use(express.json({ limit: '900mb' }));
-router.use(express.urlencoded({ limit: '900mb', extended: true }));
+router.use(express.json({ limit: '9000mb' }));
+router.use(express.urlencoded({ limit: '9000mb', extended: true }));
 
 // Configurar el tamaño máximo de archivos a 2 GB
 router.use(fileUpload({
-  limits: { fileSize: 2000 * 1024 * 1024 }, // 2 GB
+  limits: { fileSize: 6000 * 5024 * 5024 }, // 2 GB
   abortOnLimit: true,
 }));
 

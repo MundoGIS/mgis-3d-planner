@@ -325,7 +325,7 @@ app.use((req, res, next) => {
   res.status(404).render('404');
 });
 
-const port = Number.parseInt(process.env.PORT, 10) || 3001;
+const port = Number.parseInt(process.env.PORT, 10) || 3003;
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });

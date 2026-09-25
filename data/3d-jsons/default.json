@@ -17,7 +17,7 @@
         "id": "96188",
         "url": "https://assets.cesium.com/96188/tileset.json",
         "key": 1746385489068,
-        "visible": true
+        "visible": false
       },
       {
         "name": "Googles",
@@ -28,20 +28,12 @@
         "visible": false
       },
       {
-        "name": "Roads",
-        "type": "xyz",
-        "url": "https://karta.rabbalshedekraft.se/wmts/googles/Google%20Road/{z}/{x}/{y}.png",
-        "isBaseLayer": true,
-        "visible": false,
-        "key": 1790247101981
-      },
-      {
         "name": "Hybrid",
         "type": "xyz",
         "url": "https://karta.rabbalshedekraft.se/wmts/googles/Google%20Hybrid/{z}/{x}/{y}.png",
         "isBaseLayer": true,
         "visible": true,
-        "key": 1790247426939
+        "key": 1790253014852
       }
     ],
     "terrains": [
